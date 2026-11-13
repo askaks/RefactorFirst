@@ -382,6 +382,23 @@ public class SimpleHtmlReport {
         stringBuilder.append(createMenu(disharmonySpecs, rankedDisharmoniesByAnchor, rankedClassCycles));
         stringBuilder.append("</ul>\n" + "</nav>\n" + "</header>\n");
 
+        // The menu jumps down to a section; this stays on screen to jump back up.
+        stringBuilder.append(renderCollapsibleTableStyles());
+        stringBuilder.append(renderFloatingNavigation(
+                disharmonySpecs,
+                rankedDisharmoniesByAnchor,
+                !classRelationshipDisharmonies.isEmpty(),
+                !packageRelationshipDisharmonies.isEmpty(),
+                !rankedClassCycles.isEmpty()));
+
+        // What to look at first, before any of the full tables.
+        stringBuilder.append(StartHereSummary.render(
+                projectName,
+                classGraph.vertexSet().size(),
+                disharmonySpecs,
+                rankedDisharmoniesByAnchor,
+                rankedClassCycles));
+
         log.info("Generating HTML Report");
 
         stringBuilder.append(renderClassGraphVisuals(repoUrl, codebaseGraphDTO));
@@ -418,6 +435,98 @@ public class SimpleHtmlReport {
 
         log.debug(stringBuilder.toString());
         return stringBuilder;
+    }
+
+    /**
+     * Navigation fixed to the corner of the window: a "Sections" list that opens in place, and a link
+     * back to the top. The tables are long, so the way to move around has to travel with the reader.
+     * Plain HTML (a details element), so it works in the simple report too.
+     */
+    static String renderFloatingNavigation(
+            List<DisharmonySpec> specs,
+            Map<String, List<RankedDisharmony>> rankedDisharmoniesByAnchor,
+            boolean hasClassRelationships,
+            boolean hasPackageRelationships,
+            boolean hasCycles) {
+        String pill = "padding:8px 14px;border-radius:20px;background:#2b2b2b;color:#fff;text-decoration:none;"
+                + "font-family:sans-serif;font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,0.3);cursor:pointer;";
+        StringBuilder sb = new StringBuilder();
+        sb.append("<div id=\"FLOATING_NAV\" style=\"position:fixed;right:18px;bottom:18px;z-index:1000;")
+                .append("display:flex;gap:8px;align-items:flex-end;\">\n");
+        sb.append("<details style=\"position:relative;\">\n<summary style=\"list-style:none;")
+                .append(pill)
+                .append("\">&#9776; Sections</summary>\n");
+        sb.append("<div style=\"position:absolute;bottom:100%;right:0;margin-bottom:8px;min-width:230px;")
+                .append("max-height:70vh;overflow:auto;background:#fff;border:1px solid #d9d2c3;border-radius:10px;")
+                .append("box-shadow:0 2px 10px rgba(0,0,0,0.25);padding:8px 0;font-family:sans-serif;")
+                .append("font-size:14px;text-align:left;\">\n");
+        navLink(sb, "START_HERE", "Start here");
+        if (hasClassRelationships) {
+            navLink(sb, "CLASSEDGES", "Class Relationships To Remove");
+        }
+        if (hasPackageRelationships) {
+            navLink(sb, "PACKAGEEDGES", "Package Relationships To Remove");
+        }
+        for (DisharmonySpec spec : specs) {
+            List<RankedDisharmony> ranked = rankedDisharmoniesByAnchor.get(spec.anchorId());
+            if (ranked != null && !ranked.isEmpty()) {
+                navLink(sb, spec.anchorId(), spec.title() + " (" + ranked.size() + ")");
+            }
+        }
+        if (hasCycles) {
+            navLink(sb, "CYCLES", "Class Cycles");
+        }
+        sb.append("</div>\n</details>\n");
+        sb.append("<a href=\"#\" title=\"Back to the top of the report\" style=\"")
+                .append(pill)
+                .append("\">&#8593; Back to top</a>\n</div>\n");
+        return sb.toString();
+    }
+
+    /** How many rows of a long table are shown before the reader asks for the rest. */
+    static final int VISIBLE_ROWS = 10;
+
+    /**
+     * Styles for the collapsed tables. Rows past the first {@value #VISIBLE_ROWS} sit in a second table body
+     * that stays hidden until the reader ticks the (hidden) checkbox through its label. No script needed.
+     */
+    static String renderCollapsibleTableStyles() {
+        return "<style>\n"
+                + ".rf-toggle{position:absolute;opacity:0;pointer-events:none;}\n"
+                + ".rf-toggle:not(:checked) ~ table tbody.rf-more{display:none;}\n"
+                + ".rf-toggle:checked ~ label .rf-show{display:none;}\n"
+                + ".rf-toggle:not(:checked) ~ label .rf-hide{display:none;}\n"
+                + ".rf-more-label{display:inline-block;margin:10px 0;padding:6px 14px;border:1px solid #999;"
+                + "border-radius:16px;cursor:pointer;font-family:sans-serif;font-size:14px;}\n"
+                + "</style>\n";
+    }
+
+    /** The hidden checkbox that a table's "show all" label toggles. Goes just before the table. */
+    static String rowToggle(String anchorId) {
+        return "<input type=\"checkbox\" class=\"rf-toggle\" id=\"more-" + anchorId + "\"/>\n";
+    }
+
+    /** Closes the always-visible rows and opens the hidden ones, at the row where the cut falls. */
+    static String restOfRowsStartsAt(int rowIndex) {
+        return rowIndex == VISIBLE_ROWS ? "</tbody>\n<tbody class=\"rf-more\">\n" : "";
+    }
+
+    /** The control under a table that reveals or hides its remaining rows. Empty for a short table. */
+    static String rowToggleLabel(String anchorId, int totalRows) {
+        if (totalRows <= VISIBLE_ROWS) {
+            return "";
+        }
+        return "<label class=\"rf-more-label\" for=\"more-" + anchorId + "\"><span class=\"rf-show\">Show all "
+                + totalRows + " rows</span><span class=\"rf-hide\">Show only the first " + VISIBLE_ROWS
+                + "</span></label>\n";
+    }
+
+    private static void navLink(StringBuilder sb, String anchor, String label) {
+        sb.append("<a href=\"#")
+                .append(anchor)
+                .append("\" style=\"display:block;padding:5px 14px;text-decoration:none;color:#2b2b2b;\">")
+                .append(escapeHtmlLabel(label))
+                .append("</a>\n");
     }
 
     /** Reads the repository's remote URL from the project Git metadata. */
@@ -529,6 +638,7 @@ public class SimpleHtmlReport {
 
         // Content
         stringBuilder.append("<div align=\"center\">");
+        stringBuilder.append(rowToggle("CLASSEDGES"));
         stringBuilder.append("<table align=\"center\" border=\"5px\">\n");
         stringBuilder.append("<thead>\n<tr>\n");
         for (String heading : getClassRelationshipDisharmonyTableHeadings()) {
@@ -538,7 +648,9 @@ public class SimpleHtmlReport {
 
         stringBuilder.append("<tbody>\n");
 
+        int classEdgeRow = 0;
         for (RankedDisharmony edge : classRelationshipDisharmonies) {
+            stringBuilder.append(restOfRowsStartsAt(classEdgeRow++));
             stringBuilder.append("<tr>\n");
 
             for (String rowData : getClassRelationshipDisharmony(edge, repoUrl, codebaseGraphDTO)) {
@@ -550,6 +662,7 @@ public class SimpleHtmlReport {
 
         stringBuilder.append("</tbody>\n");
         stringBuilder.append("</table>\n");
+        stringBuilder.append(rowToggleLabel("CLASSEDGES", classRelationshipDisharmonies.size()));
         stringBuilder.append("</div>\n");
 
         return stringBuilder.toString();
@@ -581,6 +694,7 @@ public class SimpleHtmlReport {
 
         // Content
         stringBuilder.append("<div align=\"center\">");
+        stringBuilder.append(rowToggle("PACKAGEEDGES"));
         stringBuilder.append("<table align=\"center\" border=\"5px\">\n");
         stringBuilder.append("<thead>\n<tr>\n");
         for (String heading : getPackageRelationshipDisharmonyTableHeadings()) {
@@ -590,7 +704,9 @@ public class SimpleHtmlReport {
 
         stringBuilder.append("<tbody>\n");
 
+        int packageEdgeRow = 0;
         for (RankedDisharmony edge : edgeDisharmonies) {
+            stringBuilder.append(restOfRowsStartsAt(packageEdgeRow++));
             stringBuilder.append("<tr>\n");
 
             for (String rowData : getPackageRelationshipDisharmony(edge, repoUrl, codebaseGraphDTO)) {
@@ -602,6 +718,7 @@ public class SimpleHtmlReport {
 
         stringBuilder.append("</tbody>\n");
         stringBuilder.append("</table>\n");
+        stringBuilder.append(rowToggleLabel("PACKAGEEDGES", edgeDisharmonies.size()));
         stringBuilder.append("</div>\n");
 
         return stringBuilder.toString();
@@ -1064,6 +1181,7 @@ public class SimpleHtmlReport {
                 .append(title)
                 .append(" by the numbers: (Refactor Starting with Priority 1)</h2>\n");
         sb.append("<div align=\"center\">");
+        sb.append(rowToggle(anchorId));
         sb.append("<table align=\"center\" border=\"5px\">\n");
 
         // Build headers from the first item's ranked metrics
@@ -1101,7 +1219,9 @@ public class SimpleHtmlReport {
         sb.append("</tr>\n</thead>\n");
 
         sb.append("<tbody>\n");
+        int disharmonyRow = 0;
         for (RankedDisharmony rd : ranked) {
+            sb.append(restOfRowsStartsAt(disharmonyRow++));
             sb.append("<tr>\n");
             sb.append(drawTableCell("<a href=\"" + escapeHtmlLabel(repoUrl + rd.getPath()) + "\" target=\"_blank\">"
                     + escapeHtmlLabel(rd.getFileName()) + "</a>"));
@@ -1146,6 +1266,7 @@ public class SimpleHtmlReport {
         }
         sb.append("</tbody>\n");
         sb.append("</table>\n");
+        sb.append(rowToggleLabel(anchorId, ranked.size()));
         sb.append("</div>");
         return sb.toString();
     }
