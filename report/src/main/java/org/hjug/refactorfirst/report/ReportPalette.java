@@ -19,29 +19,36 @@ final class ReportPalette {
     /** One meaning, with the colour and mark that stand for it everywhere in the report. */
     enum Family {
         /** The tool's priority 1 of any kind. */
-        FIX_FIRST("Fix first", "#c62828", "&#9873;", "&#9873;"),
+        FIX_FIRST("Fix first", "the tool's priority 1 of its kind", "#c62828", "&#9873;", "&#9873;"),
         /** Classes that use each other in a loop, and the link to cut to break the loop. */
-        CYCLE("Cycle", "#c2188f", "&#10227;", "&#10227;"),
+        CYCLE(
+                "Cycle",
+                "classes that use each other in a loop, so none can change or be tested alone",
+                "#c2188f",
+                "&#10227;",
+                "&#10227;"),
         /** The cycle colour as a background: flagged table cells, a package that is in a cycle. */
-        CYCLE_PALE("Cycle, background", "#f7cfe9", "&#10227;", "&#10227;"),
+        CYCLE_PALE("Cycle, background", "a package that is in a package cycle", "#f7cfe9", "&#10227;", "&#10227;"),
         /** A finding about a whole class. */
-        CLASS_FINDING("Class finding", "#6a3fa0", "&#9724;", "&#9723;"),
+        CLASS_FINDING("Class finding", "a finding about a whole class", "#6a3fa0", "&#9724;", "&#9723;"),
         /** A finding about one method. */
-        METHOD_FINDING("Method finding", "#8a5a00", "&#9670;", "&#9671;"),
+        METHOD_FINDING("Method finding", "a finding about one method", "#8a5a00", "&#9670;", "&#9671;"),
         /** The most-changed file that has a finding. */
-        HOTSPOT("Hotspot", "#f08c00", "&#128293;", "&#128293;"),
+        HOTSPOT("Hotspot", "the most-changed file that has a finding", "#f08c00", "&#128293;", "&#128293;"),
         /** Nothing found. */
-        NEUTRAL("Nothing found", "#ffffff", "", ""),
+        NEUTRAL("Nothing found", "nothing found", "#ffffff", "", ""),
         /** Ordinary text, advice lines and outlines. */
-        INK("Text", "#2b2b2b", "", "");
+        INK("Text", "ordinary text and outlines", "#2b2b2b", "", "");
 
         private final String label;
+        private final String meaning;
         private final String hex;
         private final String solidMark;
         private final String hollowMark;
 
-        Family(String label, String hex, String solidMark, String hollowMark) {
+        Family(String label, String meaning, String hex, String solidMark, String hollowMark) {
             this.label = label;
+            this.meaning = meaning;
             this.hex = hex;
             this.solidMark = solidMark;
             this.hollowMark = hollowMark;
@@ -50,6 +57,11 @@ final class ReportPalette {
         /** The name a reader sees in the key. */
         String label() {
             return label;
+        }
+
+        /** What it means, as the key says it after the name. */
+        String meaning() {
+            return meaning;
         }
 
         /** The colour as a CSS and GraphViz hex value. */

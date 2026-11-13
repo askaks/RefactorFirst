@@ -557,6 +557,8 @@ public class HtmlReport extends SimpleHtmlReport {
             // revisit and add DOT SVG popup button
             stringBuilder.append("<div align=\"center\">\nSVG is too big to render quickly</div>\n");
         }
+        stringBuilder.append(ReportKey.whyMarked(
+                "WHY_CLASSES", "Class", "CLASSEDGES", classGraph, classCycles, classRelationshipsToRemove));
 
         return stringBuilder.toString();
     }
@@ -575,15 +577,8 @@ public class HtmlReport extends SimpleHtmlReport {
         stringBuilder.append(generate2DPopup(graphIdentifier, displayName));
         stringBuilder.append(generateHidePopup(graphIdentifier));
 
-        String cycleMark = "<span style=\"color:" + ReportPalette.Family.CYCLE.hex() + ";font-weight:bold;\">"
-                + ReportPalette.Family.CYCLE.mark(true) + "</span> ";
-        stringBuilder
-                .append("<div align=\"center\">\n")
-                .append(cycleMark)
-                .append("Thick pink lines are relationships to cut: removing them breaks the cycles.<br>\n");
-        stringBuilder
-                .append(cycleMark)
-                .append("Classes outlined in pink are in a cycle. Pink boxes are packages in a package cycle.<br>\n");
+        stringBuilder.append(ReportKey.forMaps());
+        stringBuilder.append("<div align=\"center\">\n");
         stringBuilder.append("Zoom in / out with your mouse wheel and click/move to drag the image.<br>\n");
         stringBuilder.append("</div>\n");
         return stringBuilder;
@@ -896,6 +891,8 @@ public class HtmlReport extends SimpleHtmlReport {
             // revisit and add DOT SVG popup button
             stringBuilder.append("<div align=\"center\">\nSVG is too big to render quickly</div>\n");
         }
+        stringBuilder.append(ReportKey.whyMarked(
+                "WHY_PACKAGES", "Package", "PACKAGEEDGES", packageGraph, packageCycles, packageRelationshipsToRemove));
 
         return stringBuilder.toString();
     }

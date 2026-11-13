@@ -93,9 +93,9 @@ final class StartHereSummary {
                         .append("\" style=\"font-weight:bold;\">")
                         .append(esc(p.name()))
                         .append("</a> ")
-                        .append(tag(p.family(), p.serious(), p.badge()));
+                        .append(ReportKey.tag(p.family(), p.serious(), p.badge()));
                 if (p.fixFirst()) {
-                    sb.append(" ").append(tag(Family.FIX_FIRST, true, "fix first"));
+                    sb.append(" ").append(ReportKey.tag(Family.FIX_FIRST, true, "fix first"));
                 }
                 sb.append("<br/><span>")
                         .append(esc(p.why()))
@@ -106,6 +106,10 @@ final class StartHereSummary {
                         .append("</span></li>\n");
             }
             sb.append("</ol>\n");
+        }
+
+        if (!picks.isEmpty()) {
+            sb.append(ReportKey.forFindings());
         }
 
         sb.append("<p style=\"margin:12px 0 0;font-size:0.9em;\">Everything found, in full below: ");
@@ -270,22 +274,6 @@ final class StartHereSummary {
 
     private static boolean isPriorityOne(RankedDisharmony d) {
         return d.getPriority() != null && d.getPriority() == 1;
-    }
-
-    /**
-     * A small rounded label. Solid: the family's colour behind the text. Outline: the family's colour as
-     * border and text on white, for the milder finding types. The family's mark leads the text either way.
-     */
-    static String tag(Family family, boolean solid, String text) {
-        String colours = solid
-                ? "color:" + family.textOn() + ";background:" + family.hex() + ";border:1.5px solid " + family.hex()
-                : "color:" + family.hex() + ";background:" + Family.NEUTRAL.hex() + ";border:1.5px solid "
-                        + family.hex();
-        String mark = family.mark(solid);
-        return "<span style=\"font-size:0.8em;font-weight:bold;" + colours + ";border-radius:9px;padding:1px 8px;\">"
-                + (mark.isEmpty() ? "" : mark + " ")
-                + esc(text)
-                + "</span>";
     }
 
     private static DisharmonySpec spec(List<DisharmonySpec> specs, String anchor) {
