@@ -132,6 +132,72 @@ class ReportKeyTest {
         assertFalse(source.contains("HtmlReport."));
     }
 
+    @Test
+    void givenTheLinksToCutKey_whenRendered_thenItExplainsTheFlagsInTheTable() {
+        String key = ReportKey.forLinksToCut();
+
+        assertTrue(key.contains(Family.CYCLE_PALE.hex()), "the flagged cycle count");
+        assertTrue(key.contains(Family.FIX_FIRST.hex()), "the fix first tag");
+        assertTrue(key.contains("hardest"), key);
+        assertTrue(key.contains("cut this first"), key);
+    }
+
+    @Test
+    void givenACycleCount_whenDrawnAsACell_thenAnyCountAboveZeroIsFlaggedInTheCycleColour() {
+        String flagged = ReportKey.cycleCountCell("2");
+        assertTrue(flagged.contains("background:" + Family.CYCLE_PALE.hex()), flagged);
+        assertTrue(flagged.contains("2 <span") && flagged.contains(Family.CYCLE.mark(true)), flagged);
+
+        assertEquals("<td align=\"right\">0</td>\n", ReportKey.cycleCountCell("0"));
+        assertEquals("<td align=\"right\">null</td>\n", ReportKey.cycleCountCell("null"), "no count, no flag");
+    }
+
+    @Test
+    void givenAPriority_whenDrawnAsACell_thenOnlyPriorityOneCarriesFixFirst() {
+        assertTrue(ReportKey.priorityCell("1").contains(Family.FIX_FIRST.hex()));
+        assertTrue(ReportKey.priorityCell("1").contains("fix first"));
+        assertEquals("<td align=\"right\">2</td>\n", ReportKey.priorityCell("2"));
+    }
+
+    @Test
+    void givenAStrength_whenDrawnAsACell_thenTheHardestInTheTableSaysSo() {
+        assertTrue(ReportKey.strengthCell("7", true).contains("hardest"));
+        assertEquals("<td align=\"right\">2</td>\n", ReportKey.strengthCell("2", false));
+    }
+
+    @Test
+    void givenARelationship_whenAskedWhyItIsListed_thenTheCycleItClosesAndTheWorkToMoveItAreNamed() {
+        Graph<VertexInfo, DefaultWeightedEdge> graph = new DefaultDirectedWeightedGraph<>(DefaultWeightedEdge.class);
+        for (String name : List.of("app.A", "app.B", "app.C", "app.X")) {
+            graph.addVertex(v(name));
+        }
+        DefaultWeightedEdge ab = graph.addEdge(v("app.A"), v("app.B"));
+        graph.setEdgeWeight(ab, 2);
+        graph.addEdge(v("app.B"), v("app.C"));
+        graph.addEdge(v("app.C"), v("app.A"));
+        DefaultWeightedEdge ax = graph.addEdge(v("app.A"), v("app.X"));
+
+        Map<VertexInfo, AsSubgraph<VertexInfo, DefaultWeightedEdge>> one = new LinkedHashMap<>();
+        one.put(v("app.A"), new AsSubgraph<>(graph, Set.of(v("app.A"), v("app.B"), v("app.C"))));
+        assertEquals("Closes a cycle of 3 classes. 2 uses to move.", ReportKey.whyLink(graph, one, ab, "classes"));
+
+        Map<VertexInfo, AsSubgraph<VertexInfo, DefaultWeightedEdge>> two = new LinkedHashMap<>(one);
+        two.put(v("app.B"), new AsSubgraph<>(graph, Set.of(v("app.A"), v("app.B"))));
+        assertEquals(
+                "Part of 2 cycles; the largest has 3 classes. 2 uses to move.",
+                ReportKey.whyLink(graph, two, ab, "classes"));
+
+        assertEquals("1 use to move.", ReportKey.whyLink(graph, one, ax, "classes"), "in no cycle we know of");
+        assertEquals("2 uses to move.", ReportKey.whyLink(graph, null, ab, "classes"));
+    }
+
+    @Test
+    void givenARelationshipToCut_whenMarked_thenItCarriesScissorsInTheCycleColour() {
+        String marked = ReportKey.cut("A &#8594; B : 1");
+        assertTrue(marked.contains("&#9986; A &#8594; B : 1"));
+        assertTrue(marked.contains("color:" + Family.CYCLE.hex()));
+    }
+
     private static VertexInfo v(String name) {
         return VertexInfo.forName(name);
     }

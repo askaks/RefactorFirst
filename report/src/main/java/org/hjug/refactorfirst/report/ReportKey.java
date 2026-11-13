@@ -166,13 +166,100 @@ final class ReportKey {
         lines.sort(Comparator.naturalOrder());
         StringBuilder sb = new StringBuilder();
         for (String line : lines) {
-            sb.append("<span style=\"color:")
-                    .append(Family.CYCLE.hex())
-                    .append(";font-weight:bold;\">&#9986; ")
-                    .append(line)
-                    .append("</span><br/>");
+            sb.append(cut(line)).append("<br/>");
         }
         return sb.toString();
+    }
+
+    /** The key above the relationships-to-cut tables: what the flags in a row mean. */
+    static String forLinksToCut() {
+        String flagged =
+                swatch("background:" + Family.CYCLE_PALE.hex() + ";border:1px solid #999;width:1.5em;height:0.9em;");
+        return "<div class=\"rf-key\" style=\"" + BOX + "\"><strong>Key</strong> "
+                + entry(tag(Family.FIX_FIRST, true, "fix first") + " priority 1: cut this first")
+                + entry(flagged + cycleMark() + "how many cycles the relationship is part of")
+                + entry("<strong>hardest</strong>: the most uses to move, of everything in the table")
+                + "</div>\n";
+    }
+
+    /** A cycle-count cell: any count above zero is the problem the table is about, so it is flagged. */
+    static String cycleCountCell(String count) {
+        if (!isPositive(count)) {
+            return plainNumberCell(count);
+        }
+        return "<td align=\"right\" style=\"background:" + Family.CYCLE_PALE.hex() + ";color:"
+                + Family.CYCLE_PALE.textOn() + ";font-weight:bold;\">" + count + " "
+                + cycleMark().strip() + "</td>\n";
+    }
+
+    /** A priority cell: priority 1 carries the "fix first" tag. */
+    static String priorityCell(String priority) {
+        if (!"1".equals(priority)) {
+            return plainNumberCell(priority);
+        }
+        return "<td align=\"right\" style=\"white-space:nowrap;\">" + priority + " "
+                + tag(Family.FIX_FIRST, true, "fix first") + "</td>\n";
+    }
+
+    /** A strength cell: the strongest relationship in the table is the hardest to cut, and says so. */
+    static String strengthCell(String strength, boolean hardest) {
+        if (!hardest) {
+            return plainNumberCell(strength);
+        }
+        return "<td align=\"right\" style=\"white-space:nowrap;font-weight:bold;\">" + strength + " hardest</td>\n";
+    }
+
+    /**
+     * One plain sentence on why a relationship is in the table: the cycle it closes and the work to move it.
+     *
+     * @param noun what the cycles are made of, in the plural: "classes" or "packages"
+     */
+    static String whyLink(
+            Graph<VertexInfo, DefaultWeightedEdge> graph,
+            Map<VertexInfo, AsSubgraph<VertexInfo, DefaultWeightedEdge>> cycles,
+            DefaultWeightedEdge edge,
+            String noun) {
+        int uses = (int) graph.getEdgeWeight(edge);
+        String work = uses + (uses == 1 ? " use" : " uses") + " to move.";
+        int in = 0;
+        int largest = 0;
+        if (cycles != null) {
+            for (AsSubgraph<VertexInfo, DefaultWeightedEdge> cycle : cycles.values()) {
+                if (cycle.containsEdge(edge)) {
+                    in++;
+                    largest = Math.max(largest, cycle.vertexSet().size());
+                }
+            }
+        }
+        if (in == 0) {
+            return work;
+        }
+        return (in == 1
+                        ? "Closes a cycle of " + largest + " " + noun + ". "
+                        : "Part of " + in + " cycles; the largest has " + largest + " " + noun + ". ")
+                + work;
+    }
+
+    /** Marks a relationship as one to cut: scissors, bold, in the cycle colour. The text must already be safe HTML. */
+    static String cut(String html) {
+        return "<span style=\"color:" + Family.CYCLE.hex() + ";font-weight:bold;\">&#9986; " + html + "</span>";
+    }
+
+    private static String cycleMark() {
+        return "<span style=\"color:" + Family.CYCLE.hex() + ";font-weight:bold;\">" + Family.CYCLE.mark(true)
+                + "</span> ";
+    }
+
+    private static String plainNumberCell(String value) {
+        return "<td align=\"right\">" + value + "</td>\n";
+    }
+
+    private static boolean isPositive(String number) {
+        try {
+            return Integer.parseInt(number) > 0;
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 
     /**

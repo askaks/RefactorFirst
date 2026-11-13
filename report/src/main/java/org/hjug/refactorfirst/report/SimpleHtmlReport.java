@@ -630,11 +630,9 @@ public class SimpleHtmlReport {
                 .append("Number of Class Relationships to Remove: ")
                 .append(classRelationshipsToRemove.size())
                 .append("<br>\n");
-        stringBuilder
-                .append("Classes with <strong>*</strong> should be broken apart")
-                .append("<br>\n")
-                .append("Removing class relationships below will eliminate class cycles");
+        stringBuilder.append("Removing class relationships below will eliminate class cycles");
         stringBuilder.append("</div>\n");
+        stringBuilder.append(ReportKey.forLinksToCut());
 
         // Content
         stringBuilder.append("<div align=\"center\">");
@@ -648,16 +646,12 @@ public class SimpleHtmlReport {
 
         stringBuilder.append("<tbody>\n");
 
+        int hardestClassEdge = hardestStrength(classRelationshipDisharmonies);
         int classEdgeRow = 0;
         for (RankedDisharmony edge : classRelationshipDisharmonies) {
             stringBuilder.append(restOfRowsStartsAt(classEdgeRow++));
-            stringBuilder.append("<tr>\n");
-
-            for (String rowData : getClassRelationshipDisharmony(edge, repoUrl, codebaseGraphDTO)) {
-                stringBuilder.append(drawTableCell(rowData));
-            }
-
-            stringBuilder.append("</tr>\n");
+            stringBuilder.append(
+                    renderClassEdgeRow(edge, isHardest(edge, hardestClassEdge), repoUrl, codebaseGraphDTO));
         }
 
         stringBuilder.append("</tbody>\n");
@@ -686,11 +680,9 @@ public class SimpleHtmlReport {
                 .append("Number of Package Relationships to Remove: ")
                 .append(packageRelationshipsToRemove.size())
                 .append("<br>\n");
-        stringBuilder
-                .append("Packages and classes with <strong>*</strong> should be broken apart")
-                .append("<br>\n")
-                .append("Removing package relationships below will eliminate package cycles");
+        stringBuilder.append("Removing package relationships below will eliminate package cycles");
         stringBuilder.append("</div>\n");
+        stringBuilder.append(ReportKey.forLinksToCut());
 
         // Content
         stringBuilder.append("<div align=\"center\">");
@@ -704,16 +696,12 @@ public class SimpleHtmlReport {
 
         stringBuilder.append("<tbody>\n");
 
+        int hardestPackageEdge = hardestStrength(edgeDisharmonies);
         int packageEdgeRow = 0;
         for (RankedDisharmony edge : edgeDisharmonies) {
             stringBuilder.append(restOfRowsStartsAt(packageEdgeRow++));
-            stringBuilder.append("<tr>\n");
-
-            for (String rowData : getPackageRelationshipDisharmony(edge, repoUrl, codebaseGraphDTO)) {
-                stringBuilder.append(drawTableCell(rowData));
-            }
-
-            stringBuilder.append("</tr>\n");
+            stringBuilder.append(
+                    renderPackageEdgeRow(edge, isHardest(edge, hardestPackageEdge), repoUrl, codebaseGraphDTO));
         }
 
         stringBuilder.append("</tbody>\n");
@@ -728,6 +716,7 @@ public class SimpleHtmlReport {
     private String[] getClassRelationshipDisharmonyTableHeadings() {
         return new String[] {
             "Class Relationship",
+            "Why it is here",
             "Priority",
             "In Class<br>Cycles",
             "Relationship<br>Strength",
@@ -740,11 +729,63 @@ public class SimpleHtmlReport {
     private String[] getPackageRelationshipDisharmonyTableHeadings() {
         return new String[] {
             "Package Relationship",
+            "Why it is here",
             "Priority",
             "In Pkg<br>Cycles",
             "Relationship<br>Strength",
             "Class Relationships to Remove<br>To Break Package Relationship",
         };
+    }
+
+    /**
+     * One row of the class relationships-to-cut table. The numbers that are the problem are flagged: a
+     * cycle count above zero, priority 1, and the strongest relationship in the table. The second cell says
+     * in plain words why the relationship is listed; it sits next to the name so it shows without scrolling.
+     */
+    String renderClassEdgeRow(
+            RankedDisharmony edge, boolean hardest, String repoUrl, CodebaseGraphDTO codebaseGraphDTO) {
+        String[] cells = getClassRelationshipDisharmony(edge, repoUrl, codebaseGraphDTO);
+        return "<tr>\n"
+                + drawTableCell(cells[0])
+                + drawTableCell(ReportKey.whyLink(classGraph, classCycles, edge.getEdge(), "classes"))
+                + ReportKey.priorityCell(cells[1])
+                + ReportKey.cycleCountCell(cells[2])
+                + ReportKey.strengthCell(cells[3], hardest)
+                + drawTableCell(cells[4])
+                + ReportKey.cycleCountCell(cells[5])
+                + "</tr>\n";
+    }
+
+    /** One row of the package relationships-to-cut table, flagged like the class table's rows. */
+    String renderPackageEdgeRow(
+            RankedDisharmony edge, boolean hardest, String repoUrl, CodebaseGraphDTO codebaseGraphDTO) {
+        String[] cells = getPackageRelationshipDisharmony(edge, repoUrl, codebaseGraphDTO);
+        return "<tr>\n"
+                + drawTableCell(cells[0])
+                + drawTableCell(ReportKey.whyLink(packageGraph, packageCycles, edge.getEdge(), "packages"))
+                + ReportKey.priorityCell(cells[1])
+                + ReportKey.cycleCountCell(cells[2])
+                + ReportKey.strengthCell(cells[3], hardest)
+                + drawTableCell(cells[4])
+                + "</tr>\n";
+    }
+
+    /** The greatest strength in a relationships table, or -1 when no row stands out as the hardest. */
+    private static int hardestStrength(List<RankedDisharmony> edges) {
+        int max = Integer.MIN_VALUE;
+        int min = Integer.MAX_VALUE;
+        for (RankedDisharmony edge : edges) {
+            if (edge.getEffortRank() != null) {
+                max = Math.max(max, edge.getEffortRank());
+                min = Math.min(min, edge.getEffortRank());
+            }
+        }
+        // With one row, or every row the same, nothing is "the hardest".
+        return edges.size() > 1 && max > min ? max : -1;
+    }
+
+    private static boolean isHardest(RankedDisharmony edge, int hardestStrength) {
+        return edge.getEffortRank() != null && edge.getEffortRank() == hardestStrength;
     }
 
     /** Builds the table cells for a ranked class relationship. */
@@ -852,26 +893,14 @@ public class SimpleHtmlReport {
                 .toString();
     }
 
-    /** Renders a weighted class edge with repository links and removal markers. */
+    /** Renders a weighted class edge with repository links. */
     private String renderClassEdge(DefaultWeightedEdge edge, String repoUrl, CodebaseGraphDTO codebaseGraphDTO) {
         StringBuilder edgesToCut = new StringBuilder();
         String[] vertexes = extractVertexes(edge);
 
-        String startVertex = vertexes[0].trim();
-        String start;
-        if (classesToRemove.contains(VertexInfo.forName(startVertex))) {
-            start = hyperlinkClass(startVertex, repoUrl, codebaseGraphDTO) + "<strong>*</strong>";
-        } else {
-            start = hyperlinkClass(startVertex, repoUrl, codebaseGraphDTO);
-        }
-
-        String endVertex = vertexes[1].trim();
-        String end;
-        if (classesToRemove.contains(VertexInfo.forName(endVertex))) {
-            end = hyperlinkClass(endVertex, repoUrl, codebaseGraphDTO) + "<strong>*</strong>";
-        } else {
-            end = hyperlinkClass(endVertex, repoUrl, codebaseGraphDTO);
-        }
+        // No star for the tool's "classes to remove": that list names classes that are in no cycle.
+        String start = hyperlinkClass(vertexes[0].trim(), repoUrl, codebaseGraphDTO);
+        String end = hyperlinkClass(vertexes[1].trim(), repoUrl, codebaseGraphDTO);
 
         // &#8594; is HTML "Right Arrow" code
         return edgesToCut
@@ -879,26 +908,14 @@ public class SimpleHtmlReport {
                 .toString();
     }
 
-    /** Renders a weighted package edge with removal markers. */
+    /** Renders a weighted package edge. */
     private String renderPackageEdge(DefaultWeightedEdge edge, String repoUrl, CodebaseGraphDTO codebaseGraphDTO) {
         StringBuilder edgesToCut = new StringBuilder();
         String[] vertexes = extractVertexes(edge);
 
-        String startVertex = vertexes[0].trim();
-        String start;
-        if (packagesToRemove.contains(VertexInfo.forName(startVertex))) {
-            start = escapeHtmlLabel(startVertex) + "<strong>*</strong>";
-        } else {
-            start = escapeHtmlLabel(startVertex);
-        }
-
-        String endVertex = vertexes[1].trim();
-        String end;
-        if (packagesToRemove.contains(VertexInfo.forName(endVertex))) {
-            end = escapeHtmlLabel(endVertex) + "<strong>*</strong>";
-        } else {
-            end = escapeHtmlLabel(endVertex);
-        }
+        // No star for the tool's "packages to remove", for the same reason as for classes.
+        String start = escapeHtmlLabel(vertexes[0].trim());
+        String end = escapeHtmlLabel(vertexes[1].trim());
 
         // &#8594; is HTML "Right Arrow" code
         return edgesToCut
@@ -969,10 +986,7 @@ public class SimpleHtmlReport {
         stringBuilder.append(renderClassCycleVisuals(cycle, repoUrl, codebaseGraphDTO));
 
         stringBuilder.append("<div align=\"center\">");
-        stringBuilder.append("<strong>");
-        stringBuilder.append(
-                "* indicates class to remove, bold text indicates relationships to remove to decompose cycle");
-        stringBuilder.append("</strong>");
+        stringBuilder.append(ReportKey.cut("marks a relationship to cut to break the cycle"));
         int classCount = cycle.getCycleNodes().size();
         int relationshipCount = cycle.getEdgeSet().size();
         stringBuilder
@@ -997,12 +1011,7 @@ public class SimpleHtmlReport {
 
         for (String vertex : cycle.getVertexSet()) {
             stringBuilder.append("<tr>");
-            String className;
-            if (classesToRemove.contains(VertexInfo.forName(vertex))) {
-                className = hyperlinkClass(vertex, repoUrl, codebaseGraphDTO) + "<strong>*</strong>";
-            } else {
-                className = hyperlinkClass(vertex, repoUrl, codebaseGraphDTO);
-            }
+            String className = hyperlinkClass(vertex, repoUrl, codebaseGraphDTO);
 
             stringBuilder.append(drawTableCell(className));
             StringBuilder edges = new StringBuilder();
@@ -1010,9 +1019,7 @@ public class SimpleHtmlReport {
                 if (edge.toString().startsWith("(" + vertex + " :")) {
 
                     if (classRelationshipsToRemove.contains(edge)) {
-                        edges.append("<strong>");
-                        edges.append(renderClassEdge(edge) + "<strong>*</strong>");
-                        edges.append("</strong>");
+                        edges.append(ReportKey.cut(renderClassEdge(edge)));
                     } else {
                         edges.append(renderClassEdge(edge));
                     }
