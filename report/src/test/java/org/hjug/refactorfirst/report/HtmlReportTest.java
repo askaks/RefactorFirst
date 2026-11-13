@@ -635,4 +635,37 @@ class HtmlReportTest {
         int edgeGuards = scripts.split("droppedClusters\\.has", -1).length - 1;
         assertEquals(4, edgeGuards, "both popup script builders must guard edges against dropped subgraph nodes");
     }
+
+    @Test
+    void givenACycleAndAFaultyRemovalList_whenTheClassMapIsBuilt_thenClassesAreMarkedByCycleMembership() {
+        // A and B use each other; Hub is used by both and is in no cycle.
+        Graph<VertexInfo, DefaultWeightedEdge> classGraph =
+                new DefaultDirectedWeightedGraph<>(DefaultWeightedEdge.class);
+        for (String name : List.of("A", "B", "Hub")) {
+            classGraph.addVertex(VertexInfo.forName(name));
+        }
+        classGraph.addEdge(VertexInfo.forName("A"), VertexInfo.forName("B"));
+        classGraph.addEdge(VertexInfo.forName("B"), VertexInfo.forName("A"));
+        classGraph.addEdge(VertexInfo.forName("A"), VertexInfo.forName("Hub"));
+        classGraph.addEdge(VertexInfo.forName("B"), VertexInfo.forName("Hub"));
+
+        HtmlReport htmlReport = new HtmlReport();
+        // What the tool's own "classes to remove" list did on its own code: it named a class outside every cycle.
+        htmlReport.classesToRemove = Set.of(VertexInfo.forName("Hub"));
+        htmlReport.classCycles = Map.of(
+                VertexInfo.forName("A"),
+                new org.jgrapht.graph.AsSubgraph<>(
+                        classGraph, Set.of(VertexInfo.forName("A"), VertexInfo.forName("B"))));
+        CodebaseGraphDTO dto = mock(CodebaseGraphDTO.class);
+        when(dto.getClassToSourceFilePathMapping()).thenReturn(new HashMap<>());
+
+        String dot = htmlReport.buildRawClassGraphDot(classGraph, "", dto);
+
+        String marked = " shape=ellipse color=\"" + ReportPalette.Family.CYCLE.hex() + "\" penwidth=2";
+        assertTrue(dot.contains("class_A [ label=\"A\"" + marked), dot);
+        assertTrue(dot.contains("class_B [ label=\"B\"" + marked), dot);
+        assertTrue(
+                dot.contains("class_Hub [ label=\"Hub\" shape=ellipse]"), "a class in no cycle is not marked: " + dot);
+        assertFalse(dot.contains("red"), "red is no longer a map colour");
+    }
 }

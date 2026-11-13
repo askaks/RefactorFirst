@@ -1,6 +1,7 @@
 package org.hjug.refactorfirst.report;
 
 import java.util.List;
+import org.hjug.refactorfirst.report.ReportPalette.Family;
 import org.hjug.refactorfirst.report.model.ClassNodeDTO;
 import org.hjug.refactorfirst.report.model.EdgeDTO;
 import org.hjug.refactorfirst.report.model.HierarchyDTO;
@@ -12,9 +13,12 @@ import org.hjug.refactorfirst.report.model.PackageNodeDTO;
  * and the package map as the flat relationship graph — one ellipse per participating package
  * with only the relationship edges, matching the main-branch package map.
  *
- * <p>Visual contract: classes marked for removal keep the {@code color=red style=filled} fill
- * in the class/cycle maps; packages flagged for breakup fill red in the flat package map,
- * and relationships flagged for removal render red everywhere.
+ * <p>Visual contract, with every colour taken from {@link ReportPalette}: a flagged class is
+ * outlined in the cycle colour in the class/cycle maps; a flagged package fills with the pale
+ * cycle colour as a cluster and is outlined in the cycle colour in the flat package map; a
+ * relationship flagged for removal is drawn thicker in the cycle colour everywhere. Nothing is
+ * red: red is kept for "fix first". What "flagged" means is the caller's decision; the HTML
+ * report flags the classes and packages that are in a cycle.
  *
  * <p>Clusters are emitted before the edges so every node keeps its cluster scope: in DOT a node
  * belongs to the cluster where it is first defined, and edges declared afterwards may freely
@@ -22,6 +26,11 @@ import org.hjug.refactorfirst.report.model.PackageNodeDTO;
  * and reference the ids pre-resolved in the hierarchy.
  */
 public final class NestedDotBuilder {
+
+    /** A class or package to look at: outlined, not filled, so its label stays readable. */
+    private static final String FLAGGED_OUTLINE = " color=\"" + Family.CYCLE.hex() + "\" penwidth=2";
+
+    private static final String FLAGGED_FILL = "\"" + Family.CYCLE_PALE.hex() + "\"";
 
     private NestedDotBuilder() {}
 
@@ -62,7 +71,7 @@ public final class NestedDotBuilder {
         // say white explicitly or it would inherit the pink. White is vizdom's default
         // cluster fill, so unflagged clusters look unchanged.
         if (pkg.isNeedsBreakUp() && !pkg.isRenderAsNode()) {
-            dot.append("style=filled fillcolor=pink;\n");
+            dot.append("style=filled fillcolor=").append(FLAGGED_FILL).append(";\n");
         } else {
             dot.append("style=filled fillcolor=white;\n");
         }
@@ -72,7 +81,7 @@ public final class NestedDotBuilder {
                     .append(HtmlReport.escapeDotQuoted(pkg.getName()))
                     .append("\" shape=rectangle");
             if (pkg.isNeedsBreakUp()) {
-                dot.append(" color=pink style=filled");
+                dot.append(" color=").append(FLAGGED_FILL).append(" style=filled");
             }
             dot.append("];\n");
         }
@@ -88,7 +97,7 @@ public final class NestedDotBuilder {
     }
 
     /**
-     * Appends one class node: label, ellipse shape, the red removal fill, then the hyperlink.
+     * Appends one class node: label, ellipse shape, the flagged outline, then the hyperlink.
      * The {@code URL}/{@code target} attributes come last — mirroring the package nodes — and
      * are emitted only when the constructed URL passes the http(s) validation the package
      * hyperlinks apply.
@@ -103,7 +112,7 @@ public final class NestedDotBuilder {
         }
         dot.append(" shape=ellipse");
         if (cls.isMarkedForRemoval()) {
-            dot.append(" color=red style=filled");
+            dot.append(FLAGGED_OUTLINE);
         }
         if (includeHyperlinks && cls.getPath() != null && !cls.getPath().isBlank()) {
             String url = (repoUrl == null ? "" : repoUrl) + cls.getPath();
@@ -120,8 +129,8 @@ public final class NestedDotBuilder {
      * removal to break cycles) renders once as an ellipse node carrying its name,
      * and the edges carry only the relationship weights — matching the
      * main-branch package map, rendered by vizdom like the class and cycle maps.
-     * Packages flagged {@code needsBreakUp} fill red; relationships flagged for
-     * removal render red. Packages with a source path also carry a hyperlink —
+     * Packages flagged {@code needsBreakUp} are outlined in the cycle colour; relationships
+     * flagged for removal are drawn in it. Packages with a source path also carry a hyperlink —
      * {@code URL} + {@code target="_blank"} — built from the repository URL
      * prefix; only http(s) URLs are ever emitted. The full hierarchy stays in
      * refactor-first.json for LLM consumption; only the relationship information
@@ -155,7 +164,7 @@ public final class NestedDotBuilder {
                         .append(HtmlReport.escapeDotQuoted(pkg.getName()))
                         .append("\" shape=ellipse");
                 if (pkg.isNeedsBreakUp()) {
-                    dot.append(" color=red style=filled");
+                    dot.append(FLAGGED_OUTLINE);
                 }
                 String url = packageHyperlinkUrl(pkg, repoUrl);
                 if (url != null) {
@@ -192,14 +201,14 @@ public final class NestedDotBuilder {
         }
     }
 
-    /** Appends one weighted edge, red when the relationship is marked for removal. */
+    /** Appends one weighted edge, thicker and in the cycle colour when the relationship is marked for removal. */
     private static void renderEdge(EdgeDTO edge, StringBuilder dot) {
         dot.append(edge.getSource()).append(" -> ").append(edge.getTarget());
         dot.append(" [ ");
         dot.append("label = \"").append(edge.getWeight()).append("\" ");
         dot.append("weight = \"").append(edge.getWeight()).append("\"");
         if (edge.isMarkedForRemoval()) {
-            dot.append(" color = \"red\"");
+            dot.append(" color = \"").append(Family.CYCLE.hex()).append("\" penwidth = \"2\"");
         }
         dot.append(" ];\n");
     }

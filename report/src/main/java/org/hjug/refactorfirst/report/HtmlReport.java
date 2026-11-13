@@ -556,8 +556,15 @@ public class HtmlReport extends SimpleHtmlReport {
         stringBuilder.append(generate2DPopup(graphIdentifier, displayName));
         stringBuilder.append(generateHidePopup(graphIdentifier));
 
-        stringBuilder.append("<div align=\"center\">\nRed lines represent relationships to remove.<br>\n");
-        stringBuilder.append("Red nodes represent classes to remove.<br>\n");
+        String cycleMark = "<span style=\"color:" + ReportPalette.Family.CYCLE.hex() + ";font-weight:bold;\">"
+                + ReportPalette.Family.CYCLE.mark(true) + "</span> ";
+        stringBuilder
+                .append("<div align=\"center\">\n")
+                .append(cycleMark)
+                .append("Thick pink lines are relationships to cut: removing them breaks the cycles.<br>\n");
+        stringBuilder
+                .append(cycleMark)
+                .append("Classes outlined in pink are in a cycle. Pink boxes are packages in a package cycle.<br>\n");
         stringBuilder.append("Zoom in / out with your mouse wheel and click/move to drag the image.<br>\n");
         stringBuilder.append("</div>\n");
         return stringBuilder;
@@ -595,13 +602,34 @@ public class HtmlReport extends SimpleHtmlReport {
     }
 
     /**
+     * Every class (or package) that is in at least one of the given cycles.
+     *
+     * <p>The maps mark these, and not {@code classesToRemove} / {@code packagesToRemove}. On this
+     * project's own code that list named a class that is in no cycle, and removing everything on it
+     * still left two of the four cycles in place, so it cannot be shown as advice. Cycle membership
+     * is a plain fact, and the relationships to remove (which do break every cycle) carry the advice.
+     */
+    static Set<VertexInfo> membersOf(
+            Map<VertexInfo, org.jgrapht.graph.AsSubgraph<VertexInfo, DefaultWeightedEdge>> cycles) {
+        Set<VertexInfo> members = new HashSet<>();
+        if (cycles != null) {
+            cycles.values().forEach(cycle -> members.addAll(cycle.vertexSet()));
+        }
+        return members;
+    }
+
+    /**
      * Builds raw DOT source for the complete class relationship graph as nested package
      * clusters containing the classes that participate in at least one relationship.
      */
     String buildRawClassGraphDot(
             Graph<VertexInfo, DefaultWeightedEdge> classGraph, String repoUrl, CodebaseGraphDTO codebaseGraphDTO) {
         HierarchyDTO hierarchy = HierarchyBuilder.buildClassHierarchy(
-                classGraph, codebaseGraphDTO, classesToRemove, packagesToRemove, classRelationshipsToRemove);
+                classGraph,
+                codebaseGraphDTO,
+                membersOf(classCycles),
+                membersOf(packageCycles),
+                classRelationshipsToRemove);
         return NestedDotBuilder.buildNestedDot(hierarchy, repoUrl, true);
     }
 
@@ -801,7 +829,12 @@ public class HtmlReport extends SimpleHtmlReport {
             String repoUrl,
             CodebaseGraphDTO codebaseGraphDTO) {
         HierarchyDTO hierarchy = HierarchyBuilder.buildCycleHierarchy(
-                classGraph, codebaseGraphDTO, classesToRemove, packagesToRemove, classRelationshipsToRemove, cycle);
+                classGraph,
+                codebaseGraphDTO,
+                membersOf(classCycles),
+                membersOf(packageCycles),
+                classRelationshipsToRemove,
+                cycle);
         return NestedDotBuilder.buildNestedDot(hierarchy, repoUrl, true);
     }
 
@@ -858,7 +891,7 @@ public class HtmlReport extends SimpleHtmlReport {
     String buildRawPackageGraphDot(
             Graph<VertexInfo, DefaultWeightedEdge> packageGraph, String repoUrl, CodebaseGraphDTO codebaseGraphDTO) {
         HierarchyDTO hierarchy = HierarchyBuilder.buildPackageHierarchy(
-                packageGraph, codebaseGraphDTO, packagesToRemove, packageRelationshipsToRemove);
+                packageGraph, codebaseGraphDTO, membersOf(packageCycles), packageRelationshipsToRemove);
         return NestedDotBuilder.buildPackageDot(hierarchy, repoUrl);
     }
 

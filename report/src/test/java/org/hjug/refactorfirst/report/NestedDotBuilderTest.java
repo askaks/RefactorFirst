@@ -28,9 +28,9 @@ import org.junit.jupiter.params.provider.CsvSource;
  *       previous emitters.</li>
  *   <li>Classes render as {@code shape=ellipse}; package-map participants as flat
  *       {@code shape=ellipse} nodes.</li>
- *   <li>Classes marked for removal keep {@code color=red style=filled}; packages that need to
+ *   <li>Classes marked for removal keep {@code color=\"#c2188f\" penwidth=2}; packages that need to
  *       be broken up fill pink as clusters ({@code style=filled fillcolor=pink}) in the
- *       class/cycle maps and red ({@code color=red style=filled}) as nodes in the flat
+ *       class/cycle maps and red ({@code color=\"#c2188f\" penwidth=2}) as nodes in the flat
  *       package map.</li>
  *   <li>Every cluster declares an explicit fill — pink when flagged, white otherwise — because
  *       vizdom propagates a styled cluster's fill to its nested cluster rects; the explicit
@@ -154,8 +154,8 @@ class NestedDotBuilderTest {
                 + "style=filled fillcolor=white;\n"
                 + "subgraph " + HierarchyBuilder.clusterId("p.a") + " {\n"
                 + "label=\"p.a\";\n"
-                + "style=filled fillcolor=pink;\n"
-                + "A [ shape=ellipse color=red style=filled];\n"
+                + "style=filled fillcolor=\"#f7cfe9\";\n"
+                + "A [ shape=ellipse color=\"#c2188f\" penwidth=2];\n"
                 + "B [ shape=ellipse];\n"
                 + "}\n"
                 + "subgraph " + HierarchyBuilder.clusterId("p.b") + " {\n"
@@ -227,13 +227,13 @@ class NestedDotBuilderTest {
                 + hjugNodeId
                 + " [label=\"org.hjug\" shape=ellipse];\n"
                 + cbcNodeId
-                + " [label=\"org.hjug.cbc\" shape=ellipse color=red style=filled];\n"
+                + " [label=\"org.hjug.cbc\" shape=ellipse color=\"#c2188f\" penwidth=2];\n"
                 + dsmNodeId
                 + " [label=\"org.hjug.dsm\" shape=ellipse];\n"
                 + hjugNodeId
                 + " -> " + cbcNodeId + " [ label = \"1\" weight = \"1\" ];\n"
                 + cbcNodeId
-                + " -> " + dsmNodeId + " [ label = \"2\" weight = \"2\" color = \"red\" ];\n"
+                + " -> " + dsmNodeId + " [ label = \"2\" weight = \"2\" color = \"#c2188f\" penwidth = \"2\" ];\n"
                 + "}";
         assertEquals(expected, dot);
     }
@@ -466,7 +466,7 @@ class NestedDotBuilderTest {
                 + "A [ shape=ellipse];\n"
                 + "B [ shape=ellipse];\n"
                 + "}\n"
-                + "A -> B [ label = \"2\" weight = \"2\" color = \"red\" ];\n"
+                + "A -> B [ label = \"2\" weight = \"2\" color = \"#c2188f\" penwidth = \"2\" ];\n"
                 + "B -> A [ label = \"1\" weight = \"1\" ];\n"
                 + "}";
         assertEquals(expected, dot);
@@ -525,13 +525,15 @@ class NestedDotBuilderTest {
         int pink = 0;
         int white = 0;
         for (String line : lines) {
-            if (line.equals("style=filled fillcolor=pink;")) pink++;
+            if (line.equals("style=filled fillcolor=\"#f7cfe9\";")) pink++;
             if (line.equals("style=filled fillcolor=white;")) white++;
         }
         assertEquals(1, pink, "only the flagged package cluster fills pink");
         assertEquals(3, white, "the two children and the neutral ancestor fill white");
         assertEquals("style=filled fillcolor=white;", lines.get(lines.indexOf("label=\"org.hjug\";") + 1));
-        assertEquals("style=filled fillcolor=pink;", lines.get(lines.indexOf("label=\"org.hjug.graphbuilder\";") + 1));
+        assertEquals(
+                "style=filled fillcolor=\"#f7cfe9\";",
+                lines.get(lines.indexOf("label=\"org.hjug.graphbuilder\";") + 1));
         assertEquals(
                 "style=filled fillcolor=white;",
                 lines.get(lines.indexOf("label=\"org.hjug.graphbuilder.metrics\";") + 1));
