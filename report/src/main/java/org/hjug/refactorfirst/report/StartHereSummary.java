@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.Set;
 import org.hjug.cbc.RankedCycle;
 import org.hjug.cbc.RankedDisharmony;
+import org.hjug.refactorfirst.report.ReportPalette.Family;
 import org.hjug.refactorfirst.report.SimpleHtmlReport.DisharmonySpec;
 
 /**
@@ -39,8 +40,23 @@ final class StartHereSummary {
 
     private StartHereSummary() {}
 
-    /** One entry in the "places to look first" list. */
-    record Pick(String name, String badge, String badgeColour, String why, String action, String anchor, String key) {}
+    /**
+     * One entry in the "places to look first" list.
+     *
+     * @param family what kind of thing it is; decides the tag's colour and mark
+     * @param serious a solid tag when true, an outline for the milder finding types
+     * @param fixFirst the tool's priority 1 of its kind, which earns the red "fix first" tag beside its own
+     */
+    record Pick(
+            String name,
+            String badge,
+            Family family,
+            boolean serious,
+            boolean fixFirst,
+            String why,
+            String action,
+            String anchor,
+            String key) {}
 
     static String render(
             String projectName,
@@ -76,13 +92,16 @@ final class StartHereSummary {
                         .append(p.anchor())
                         .append("\" style=\"font-weight:bold;\">")
                         .append(esc(p.name()))
-                        .append("</a> <span style=\"font-size:0.8em;font-weight:bold;color:#fff;background:")
-                        .append(p.badgeColour())
-                        .append(";border-radius:9px;padding:1px 8px;\">")
-                        .append(esc(p.badge()))
-                        .append("</span><br/><span>")
+                        .append("</a> ")
+                        .append(tag(p.family(), p.serious(), p.badge()));
+                if (p.fixFirst()) {
+                    sb.append(" ").append(tag(Family.FIX_FIRST, true, "fix first"));
+                }
+                sb.append("<br/><span>")
                         .append(esc(p.why()))
-                        .append("</span><br/><span style=\"color:#2e7d32;\">")
+                        .append("</span><br/><span style=\"color:")
+                        .append(Family.INK.hex())
+                        .append(";\">&#8594; ")
                         .append(esc(p.action()))
                         .append("</span></li>\n");
             }
@@ -130,10 +149,10 @@ final class StartHereSummary {
 
         // 4. Room left: the next most serious things.
         for (RankedDisharmony d : byPriority(findingsByAnchor, BRAIN_METHOD)) {
-            add(picks, keys, files, methodPick(d, spec(specs, BRAIN_METHOD), "#b26a00", typeLabel(d)));
+            add(picks, keys, files, methodPick(d, spec(specs, BRAIN_METHOD), Family.METHOD_FINDING, typeLabel(d)));
         }
         for (RankedDisharmony d : byPriority(findingsByAnchor, FEATURE_ENVY)) {
-            add(picks, keys, files, methodPick(d, spec(specs, FEATURE_ENVY), "#b26a00", typeLabel(d)));
+            add(picks, keys, files, methodPick(d, spec(specs, FEATURE_ENVY), Family.METHOD_FINDING, typeLabel(d)));
         }
         for (RankedDisharmony d : seriousClasses) {
             add(picks, keys, files, classPick(d, specs, findingsByAnchor));
@@ -173,14 +192,16 @@ final class StartHereSummary {
         return new Pick(
                 simpleName(d.getClassName()),
                 d.getDisharmonyType(),
-                "#c62828",
+                ReportPalette.forFinding(own.methodLevel()),
+                ReportPalette.isSerious(own.anchorId()),
+                isPriorityOne(d),
                 why,
                 sentence(own.solution()),
                 own.anchorId(),
                 "file:" + d.getPath() + "#" + own.anchorId());
     }
 
-    private static Pick methodPick(RankedDisharmony d, DisharmonySpec spec, String colour, String badge) {
+    private static Pick methodPick(RankedDisharmony d, DisharmonySpec spec, Family family, String badge) {
         if (spec == null) {
             return null;
         }
@@ -189,7 +210,10 @@ final class StartHereSummary {
         return new Pick(
                 name,
                 badge,
-                colour,
+                family,
+                family != Family.METHOD_FINDING || ReportPalette.isSerious(spec.anchorId()),
+                // The hotspot is chosen for how often it changes, not for its rank, so it is never "fix first".
+                family == Family.METHOD_FINDING && isPriorityOne(d),
                 sentence(spec.problem()) + " " + changed(d),
                 sentence(spec.solution()),
                 spec.anchorId(),
@@ -201,7 +225,9 @@ final class StartHereSummary {
         return new Pick(
                 simpleName(cycle.getCycleName()) + " cycle",
                 "Cycle · " + classes + " classes",
-                "#b26a00",
+                Family.CYCLE,
+                true,
+                false,
                 "The largest knot: " + classes
                         + " classes that depend on each other in a loop, so none can change or be tested alone.",
                 "See which relationships to cut to break it apart.",
@@ -227,7 +253,8 @@ final class StartHereSummary {
         if (best == null) {
             return Optional.empty();
         }
-        return Optional.ofNullable(methodPick(best, bestSpec, "#1565c0", "Hotspot · " + commitsText(commits(best))));
+        return Optional.ofNullable(
+                methodPick(best, bestSpec, Family.HOTSPOT, "Hotspot · " + commitsText(commits(best))));
     }
 
     private static List<RankedDisharmony> byPriority(Map<String, List<RankedDisharmony>> findings, String anchor) {
@@ -239,6 +266,26 @@ final class StartHereSummary {
                 .sorted(Comparator.comparingInt(
                         (RankedDisharmony d) -> d.getPriority() == null ? Integer.MAX_VALUE : d.getPriority()))
                 .toList();
+    }
+
+    private static boolean isPriorityOne(RankedDisharmony d) {
+        return d.getPriority() != null && d.getPriority() == 1;
+    }
+
+    /**
+     * A small rounded label. Solid: the family's colour behind the text. Outline: the family's colour as
+     * border and text on white, for the milder finding types. The family's mark leads the text either way.
+     */
+    static String tag(Family family, boolean solid, String text) {
+        String colours = solid
+                ? "color:" + family.textOn() + ";background:" + family.hex() + ";border:1.5px solid " + family.hex()
+                : "color:" + family.hex() + ";background:" + Family.NEUTRAL.hex() + ";border:1.5px solid "
+                        + family.hex();
+        String mark = family.mark(solid);
+        return "<span style=\"font-size:0.8em;font-weight:bold;" + colours + ";border-radius:9px;padding:1px 8px;\">"
+                + (mark.isEmpty() ? "" : mark + " ")
+                + esc(text)
+                + "</span>";
     }
 
     private static DisharmonySpec spec(List<DisharmonySpec> specs, String anchor) {

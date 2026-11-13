@@ -176,6 +176,91 @@ class StartHereSummaryTest {
         assertTrue(SimpleHtmlReport.renderCollapsibleTableStyles().contains("tbody.rf-more{display:none;}"));
     }
 
+    @Test
+    void givenEachKindOfPick_whenPicked_thenItsFamilyComesFromThePalette() {
+        findings.put("GOD", List.of(god("app.Billing", 1, 24)));
+        findings.put("BRAIN_CLASS", List.of(classFinding(DisharmonyTypes.BRAIN_CLASS, "app.Aggregator", 1, 9)));
+        findings.put("BRAIN_METHOD", List.of(method(DisharmonyTypes.BRAIN_METHOD, "app.Parser", "parse()", 1, 3)));
+        findings.put("FEATURE_ENVY", List.of(method(DisharmonyTypes.FEATURE_ENVY, "app.Envious", "peek()", 1, 2)));
+        findings.put(
+                "INTENSIVE_COUPLING", List.of(method(DisharmonyTypes.INTENSIVE_COUPLING, "app.Busy", "run()", 1, 101)));
+
+        Map<String, StartHereSummary.Pick> byName = new LinkedHashMap<>();
+        for (StartHereSummary.Pick pick :
+                StartHereSummary.pick(SimpleHtmlReport.DISHARMONY_SPECS, findings, List.of(cycle("app.Loop", 4, 1)))) {
+            byName.put(pick.name(), pick);
+        }
+
+        assertEquals(ReportPalette.Family.CLASS_FINDING, byName.get("Billing").family());
+        assertTrue(byName.get("Billing").serious());
+        assertEquals(
+                ReportPalette.Family.CLASS_FINDING, byName.get("Aggregator").family());
+        assertEquals(ReportPalette.Family.CYCLE, byName.get("Loop cycle").family());
+        assertEquals(ReportPalette.Family.HOTSPOT, byName.get("Busy.run()").family());
+    }
+
+    @Test
+    void givenMethodPicks_whenPicked_thenBrainMethodIsSolidAndFeatureEnvyIsAnOutline() {
+        findings.put("BRAIN_METHOD", List.of(method(DisharmonyTypes.BRAIN_METHOD, "app.Parser", "parse()", 1, 30)));
+        findings.put(
+                "FEATURE_ENVY",
+                List.of(
+                        method(DisharmonyTypes.FEATURE_ENVY, "app.Parser", "peek()", 1, 30),
+                        method(DisharmonyTypes.FEATURE_ENVY, "app.Envious", "look()", 2, 2)));
+
+        List<StartHereSummary.Pick> picks =
+                StartHereSummary.pick(SimpleHtmlReport.DISHARMONY_SPECS, findings, List.of());
+        StartHereSummary.Pick envy = picks.stream()
+                .filter(p -> p.name().equals("Envious.look()"))
+                .findFirst()
+                .orElseThrow();
+
+        assertEquals(ReportPalette.Family.METHOD_FINDING, envy.family());
+        assertFalse(envy.serious(), "Feature Envy is a milder finding, so its tag is an outline");
+    }
+
+    @Test
+    void givenPicks_whenPicked_thenOnlyPriorityOneOfItsKindIsMarkedFixFirst() {
+        findings.put("GOD", List.of(god("app.Billing", 1, 24), god("app.Mailer", 2, 15)));
+
+        List<StartHereSummary.Pick> picks =
+                StartHereSummary.pick(SimpleHtmlReport.DISHARMONY_SPECS, findings, List.of(cycle("app.Loop", 4, 1)));
+
+        assertTrue(picks.get(0).fixFirst(), "Billing is priority 1 of the God Classes");
+        assertFalse(picks.get(1).fixFirst(), "Mailer is priority 2");
+        assertFalse(picks.get(2).fixFirst(), "a cycle is not marked here; the cycle cards decide that");
+    }
+
+    @Test
+    void givenPicks_whenRendered_thenTagsUseThePaletteAndNoColourIsTypedByHand() {
+        findings.put("GOD", List.of(god("app.Billing", 1, 24)));
+        findings.put(
+                "FEATURE_ENVY",
+                List.of(
+                        method(DisharmonyTypes.FEATURE_ENVY, "app.Busy", "run()", 1, 101),
+                        method(DisharmonyTypes.FEATURE_ENVY, "app.Envious", "look()", 2, 2)));
+
+        String html = render(List.of(cycle("app.Loop", 4, 1)));
+
+        // Solid tag: the family colour is the background, with the family's solid mark.
+        assertTrue(html.contains("background:" + ReportPalette.Family.CLASS_FINDING.hex()));
+        assertTrue(html.contains(ReportPalette.Family.CLASS_FINDING.mark(true) + " " + DisharmonyTypes.GOD_CLASS));
+        // Outline tag: the family colour is the border and the text, with the hollow mark.
+        assertTrue(html.contains("border:1.5px solid " + ReportPalette.Family.METHOD_FINDING.hex()));
+        assertTrue(html.contains(ReportPalette.Family.METHOD_FINDING.mark(false) + " " + DisharmonyTypes.FEATURE_ENVY));
+        assertTrue(html.contains("background:" + ReportPalette.Family.CYCLE.hex()));
+        assertTrue(html.contains(ReportPalette.Family.CYCLE.mark(true) + " Cycle"));
+        assertTrue(html.contains("background:" + ReportPalette.Family.HOTSPOT.hex()));
+        assertTrue(html.contains(ReportPalette.Family.HOTSPOT.mark(true) + " Hotspot"));
+        // Fix first sits beside the kind's tag, once: only Billing is priority 1 and not the hotspot.
+        assertEquals(1, html.split(ReportPalette.Family.FIX_FIRST.mark(true) + " fix first", -1).length - 1);
+        assertTrue(html.contains("background:" + ReportPalette.Family.FIX_FIRST.hex()));
+        // The old hand-typed colours are gone: brown for cycles, blue for hotspots, green for advice.
+        assertFalse(html.contains("#b26a00"));
+        assertFalse(html.contains("#1565c0"));
+        assertFalse(html.contains("#2e7d32"));
+    }
+
     private String render(List<RankedCycle> cycles) {
         return StartHereSummary.render("Shop", 100, SimpleHtmlReport.DISHARMONY_SPECS, findings, cycles);
     }
