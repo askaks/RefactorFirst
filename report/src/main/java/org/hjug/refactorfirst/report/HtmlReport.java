@@ -228,11 +228,18 @@ public class HtmlReport extends SimpleHtmlReport {
 
 
                             // use node labels instead of spheres
+                            // The label's colour is the one the map gave the class (in a cycle or not).
+                            // The mouse never changes it: it outlines the label instead.
                             Graph.nodeThreeObject(node => {
                                 const sprite = new SpriteText(node.label);
                                 sprite.material.depthWrite = false; // make sprite background transparent
                                 sprite.color = node.color;
                                 sprite.textHeight = 4;
+                                sprite.padding = 1.5;
+                                sprite.borderRadius = 2;
+                                sprite.borderColor = 'white';
+                                sprite.borderWidth = 0;
+                                node.sprite = sprite;
                                 return sprite;
                             });
 
@@ -262,8 +269,18 @@ public class HtmlReport extends SimpleHtmlReport {
                             const highlightNodes = new Set();
                             const highlightLinks = new Set();
                             let hoverNode = null;
+                            // Outline widths, in the same units as the label's text height:
+                            // thick for the class under the mouse, thin for its neighbours.
+                            const HOVER_BORDER = 0.8;
+                            const NEIGHBOUR_BORDER = 0.25;
+                            const outlineLabels = () => gData.nodes.forEach(node => {
+                                const sprite = node.sprite;
+                                if (!sprite) return;
+                                const width = !highlightNodes.has(node) ? 0
+                                    : node === hoverNode ? HOVER_BORDER : NEIGHBOUR_BORDER;
+                                if (sprite.borderWidth !== width) sprite.borderWidth = width;
+                            });
                             Graph
-                                .nodeColor(node => highlightNodes.has(node) ? node === hoverNode ? 'rgb(255,0,0,1)' : 'rgba(255,160,0,0.8)' : 'rgba(0,255,255,0.6)')
                                 .linkWidth(link => highlightLinks.has(link) ? 4 : 1)
                                 .linkDirectionalParticles(link => highlightLinks.has(link) ? 4 : 0)
                                 .linkDirectionalParticleWidth(4)
@@ -281,6 +298,7 @@ public class HtmlReport extends SimpleHtmlReport {
 
                                     hoverNode = node || null;
 
+                                    outlineLabels();
                                     updateHighlight(Graph);
                                 })
                                 .onLinkHover(link => {
@@ -293,6 +311,8 @@ public class HtmlReport extends SimpleHtmlReport {
                                         highlightNodes.add(link.target);
                                     }
 
+                                    hoverNode = null;
+                                    outlineLabels();
                                     updateHighlight(Graph);
                                 });
 
@@ -303,7 +323,6 @@ public class HtmlReport extends SimpleHtmlReport {
                     function updateHighlight(Graph) {
                         // trigger update of highlighted objects in scene
                         Graph
-                            .nodeColor(Graph.nodeColor())
                             .linkWidth(Graph.linkWidth())
                             .linkDirectionalParticles(Graph.linkDirectionalParticles());
                     }

@@ -668,4 +668,20 @@ class HtmlReportTest {
                 dot.contains("class_Hub [ label=\"Hub\" shape=ellipse]"), "a class in no cycle is not marked: " + dot);
         assertFalse(dot.contains("red"), "red is no longer a map colour");
     }
+
+    @Test
+    void givenThe3dViewScript_whenTheMouseIsOverAClass_thenItIsOutlinedAndKeepsItsColour() {
+        String script = HtmlReport.FORCE_3D_GRAPH;
+
+        // A label's colour says what the class is (in a cycle or not). The mouse must not repaint it:
+        // the old hover colours were red, orange and cyan, and red and orange already mean something else.
+        assertFalse(script.contains("rgb(255,0,0"), "no red under the mouse");
+        assertFalse(script.contains("rgba(255,160,0"), "no orange for neighbours");
+        assertFalse(script.contains("rgba(0,255,255"), "no cyan at rest");
+        assertFalse(script.contains(".nodeColor("), "the labels replace the balls, so a ball colour does nothing");
+        // The mouse outlines instead: thick for the class under it, thin for its neighbours.
+        assertTrue(script.contains("node === hoverNode ? HOVER_BORDER : NEIGHBOUR_BORDER"));
+        assertTrue(script.contains("sprite.borderWidth = width"));
+        assertTrue(script.contains("sprite.color = node.color;"), "the label keeps the colour the map gave it");
+    }
 }
