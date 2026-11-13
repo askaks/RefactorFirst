@@ -11,10 +11,19 @@ import org.hjug.graphbuilder.GraphBuilderConfig;
  */
 public interface SourceFileGraphBuilder {
 
+    /**
+     * True when the file sits inside the configured directory. Several directories may be given,
+     * separated by commas, for repositories that keep fixtures outside their test folders.
+     */
     static boolean isInConfiguredDirectory(Path file, String directory) {
         String normalizedFile = "/" + file.toString().replace('\\', '/') + "/";
-        String normalizedDirectory = directory.replace('\\', '/').replaceAll("^/+|/+$", "");
-        return normalizedFile.contains("/" + normalizedDirectory + "/");
+        for (String one : directory.split(",")) {
+            String normalizedDirectory = one.trim().replace('\\', '/').replaceAll("^/+|/+$", "");
+            if (!normalizedDirectory.isEmpty() && normalizedFile.contains("/" + normalizedDirectory + "/")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

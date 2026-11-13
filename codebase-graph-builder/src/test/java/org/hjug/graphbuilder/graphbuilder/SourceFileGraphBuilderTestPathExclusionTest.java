@@ -24,6 +24,18 @@ import org.junit.jupiter.api.io.TempDir;
  */
 class SourceFileGraphBuilderTestPathExclusionTest {
 
+    /** Several folders can be excluded at once: a repository may keep fixtures outside its test folders. */
+    @Test
+    void severalDirectoriesCanBeGivenSeparatedByCommas() {
+        String both = "src/test, test-resources";
+        assertTrue(SourceFileGraphBuilder.isInConfiguredDirectory(Path.of("project/src/test/java/Example.java"), both));
+        assertTrue(SourceFileGraphBuilder.isInConfiguredDirectory(
+                Path.of("test-resources/src/main/resources/Example.java"), both));
+        assertFalse(
+                SourceFileGraphBuilder.isInConfiguredDirectory(Path.of("project/src/main/java/Example.java"), both));
+        assertFalse(SourceFileGraphBuilder.isInConfiguredDirectory(Path.of("project/src/main/java/Example.java"), ","));
+    }
+
     @Test
     void directoryMatchingDoesNotExcludeLongerDirectoryNames() {
         assertTrue(SourceFileGraphBuilder.isInConfiguredDirectory(
