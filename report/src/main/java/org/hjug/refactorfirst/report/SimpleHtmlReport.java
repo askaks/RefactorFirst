@@ -21,6 +21,7 @@ import org.hjug.feedback.CycleRemovalResult;
 import org.hjug.git.GitLogReader;
 import org.hjug.graphbuilder.CodebaseGraphDTO;
 import org.hjug.graphbuilder.VertexInfo;
+import org.hjug.graphbuilder.metrics.DisharmonyLimits;
 import org.hjug.graphbuilder.metrics.DisharmonyMetric;
 import org.hjug.graphbuilder.metrics.DisharmonyTypes;
 import org.hjug.metrics.DisharmonyInstance;
@@ -1146,6 +1147,29 @@ public class SimpleHtmlReport {
     }
 
     /**
+     * Says what made something a finding: each of its numbers, named in plain words, with the limit it had
+     * to cross where the rule has one. Nothing new is measured; these are the numbers the rule already used.
+     */
+    static String whyFinding(RankedDisharmony rd) {
+        List<DisharmonyMetric> metrics = rd.getRankedMetrics();
+        if (metrics == null || metrics.isEmpty()) {
+            return "";
+        }
+        List<String> lines = new ArrayList<>();
+        for (DisharmonyMetric m : metrics) {
+            double v = m.getValue();
+            // Whole numbers as they are; ratios to two places, which is all a reader can use.
+            String value = v == Math.floor(v) ? String.valueOf((long) v) : String.format(Locale.US, "%.2f", v);
+            String line = "<strong>" + value + "</strong> " + escapeHtmlLabel(DisharmonyLimits.plainName(m.getName()));
+            lines.add(line
+                    + DisharmonyLimits.of(rd.getDisharmonyType(), m.getName())
+                            .map(l -> " <span style=\"color:#666;\">(flagged " + l.describe() + ")</span>")
+                            .orElse(""));
+        }
+        return String.join("<br/>", lines);
+    }
+
+    /**
      * Renders a table section for any disharmony type.
      * Column headers are derived from the ranked metrics carried on each RankedDisharmony.
      */
@@ -1201,6 +1225,7 @@ public class SimpleHtmlReport {
         if (methodLevel) {
             sb.append("<th>Method</th>\n");
         }
+        sb.append("<th>Why it is here</th>\n");
         sb.append("<th>Priority</th>\n");
         if (showDetails) {
             sb.append("<th>Raw Priority</th>\n");
@@ -1240,7 +1265,10 @@ public class SimpleHtmlReport {
                 }
                 sb.append(drawTableCell(sig != null ? sig.replace("<", "&lt;").replace(">", "&gt;") : ""));
             }
-            sb.append(drawTableCell(rd.getPriority().toString()));
+            sb.append("<td align=\"left\" style=\"white-space:nowrap;text-align:left;\">")
+                    .append(whyFinding(rd))
+                    .append("</td>\n");
+            sb.append(ReportKey.priorityCell(rd.getPriority().toString()));
             if (showDetails) {
                 sb.append(drawTableCell(rd.getRawPriority().toString()));
                 sb.append(drawTableCell(rd.getDescription() != null ? rd.getDescription() : ""));
@@ -1251,7 +1279,14 @@ public class SimpleHtmlReport {
                 for (DisharmonyMetric m : rd.getRankedMetrics()) {
                     double v = m.getValue();
                     String formatted = v == Math.floor(v) ? String.valueOf((long) v) : String.valueOf(v);
-                    sb.append(drawTableCell(formatted));
+                    String limit = DisharmonyLimits.of(rd.getDisharmonyType(), m.getName())
+                            .map(l -> " <span style=\"font-size:0.85em;color:#666;white-space:nowrap;\">("
+                                    + l.describe() + ")</span>")
+                            .orElse("");
+                    sb.append(
+                            limit.isEmpty()
+                                    ? drawTableCell(formatted)
+                                    : "<td align=\"right\">" + formatted + limit + "</td>\n");
                     sb.append(drawTableCell(m.getRank() != null ? m.getRank().toString() : ""));
                 }
             }

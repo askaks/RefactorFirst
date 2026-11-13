@@ -19,48 +19,48 @@ import org.hjug.graphbuilder.metrics.DisharmonyMetric.Direction;
 public class DisharmonyDetector {
 
     // Linguistic quantifiers (Lanza & Marinescu, Table 2.4)
-    private static final int FEW = 5;
-    private static final int SHORT_MEMORY_CAP = 7;
-    private static final int MANY =
+    static final int FEW = 5;
+    static final int SHORT_MEMORY_CAP = 7;
+    static final int MANY =
             SHORT_MEMORY_CAP; // Table 2.4: same as SHORT_MEMORY_CAP — "many" begins above short-term memory limit
-    private static final int SHALLOW = 1;
+    static final int SHALLOW = 1;
 
     // Fraction thresholds (Table 2.3)
-    private static final double ONE_QUARTER = 0.25;
-    private static final double ONE_THIRD = 0.33;
-    private static final double HALF = 0.5;
-    private static final double TWO_THIRDS = 0.67;
+    static final double ONE_QUARTER = 0.25;
+    static final double ONE_THIRD = 0.33;
+    static final double HALF = 0.5;
+    static final double TWO_THIRDS = 0.67;
 
     // WMC thresholds (Table 2.2)
-    private static final int WMC_AVERAGE = 14;
-    private static final int WMC_HIGH = 31;
-    private static final int WMC_VERY_HIGH = 47;
+    static final int WMC_AVERAGE = 14;
+    static final int WMC_HIGH = 31;
+    static final int WMC_VERY_HIGH = 47;
 
     // LOC class-level thresholds (Table 2.2)
-    private static final int LOC_CLASS_VERY_HIGH = 195;
+    static final int LOC_CLASS_VERY_HIGH = 195;
 
     // NOM thresholds (Table 2.2)
-    private static final int NOM_AVERAGE = 7;
-    private static final int NOM_HIGH = 12;
+    static final int NOM_AVERAGE = 7;
+    static final int NOM_HIGH = 12;
 
     // AMW thresholds (Table 2.2)
-    private static final double AMW_AVERAGE = 2.0;
+    static final double AMW_AVERAGE = 2.0;
 
     // Brain Method thresholds (Lanza & Marinescu, Chapter 5)
-    private static final int BRAIN_METHOD_LOC = 65; // LOC_CLASS_HIGH / 2 = 130 / 2 = 65
-    private static final int CYCLO_HIGH = 4; // ceiling(AMW_HIGH = 3.1)
-    private static final int MAXNESTING_DEEP = 5; // book-defined threshold
-    private static final int NOAV_MANY = SHORT_MEMORY_CAP; // Table 2.4: MANY = Short Memory Capacity = 7
+    static final int BRAIN_METHOD_LOC = 65; // LOC_CLASS_HIGH / 2 = 130 / 2 = 65
+    static final int CYCLO_HIGH = 4; // ceiling(AMW_HIGH = 3.1)
+    static final int MAXNESTING_DEEP = 5; // book-defined threshold
+    static final int NOAV_MANY = SHORT_MEMORY_CAP; // Table 2.4: MANY = Short Memory Capacity = 7
 
     // God Class thresholds (Lanza & Marinescu, Chapter 5)
-    private static final int GOD_CLASS_ATFD_FEW = 5;
-    private static final int GOD_CLASS_WMC_VERY_HIGH = 47;
+    static final int GOD_CLASS_ATFD_FEW = 5;
+    static final int GOD_CLASS_WMC_VERY_HIGH = 47;
 
     // Kotlin-specific disharmony thresholds
-    private static final int EXCESSIVE_EXTENSIONS_COUNT = 10;
-    private static final int EXCESSIVE_EXTENSIONS_RECEIVER_TYPES = 5;
-    private static final int LARGE_SEALED_HIERARCHY_SUBTYPES = 12;
-    private static final int DATA_CLASS_WITH_LOGIC_WMC = 14;
+    static final int EXCESSIVE_EXTENSIONS_COUNT = 10;
+    static final int EXCESSIVE_EXTENSIONS_RECEIVER_TYPES = 5;
+    static final int LARGE_SEALED_HIERARCHY_SUBTYPES = 12;
+    static final int DATA_CLASS_WITH_LOGIC_WMC = 14;
 
     @Data
     public static class ClassDisharmony {
