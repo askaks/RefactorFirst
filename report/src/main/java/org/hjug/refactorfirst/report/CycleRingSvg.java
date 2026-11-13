@@ -1,0 +1,236 @@
+package org.hjug.refactorfirst.report;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import org.hjug.refactorfirst.report.ReportPalette.Family;
+
+/**
+ * Draws one cycle as a ring: its classes placed round a circle, its links as curved arrows, and the
+ * links the tool suggests cutting drawn thick in the cycle colour with scissors and the number of uses.
+ *
+ * <p>A cycle is a loop, so it is drawn as one; a straight line of arrows hides that. The output is an
+ * inline SVG with no script, so it works in the simple report too. Colours come from
+ * {@link ReportPalette}. Like {@link ReportKey}, this uses nothing else from the report, so that the
+ * report classes can use it without it joining a dependency cycle of its own.
+ */
+final class CycleRingSvg {
+
+    /** A cycle with more classes than this is listed by name: a ring that crowded cannot be read. */
+    static final int MAX_CLASSES = 8;
+
+    static final int WIDTH = 318;
+    static final int HEIGHT = 214;
+
+    private static final double RADIUS = 70;
+    private static final double PILL_HALF_HEIGHT = 11;
+    private static final double CHAR_WIDTH = 6.3;
+
+    private CycleRingSvg() {}
+
+    /**
+     * One "uses" link between two classes of the cycle.
+     *
+     * @param from fully qualified name of the class that uses
+     * @param to fully qualified name of the class that is used
+     * @param uses how many uses the link stands for
+     * @param cut whether this is a link the tool suggests cutting to break the cycle
+     */
+    record Link(String from, String to, int uses, boolean cut) {}
+
+    /**
+     * Renders the ring.
+     *
+     * @param id unique on the page; the arrowheads are defined once per drawing under this id
+     * @param classNames the fully qualified names of the classes in the cycle, in the order to place them
+     * @param links the links between them; a link naming a class that is not in the list is ignored
+     * @return an inline SVG, or a plain list of names when there are more than {@value #MAX_CLASSES} classes
+     */
+    static String render(String id, List<String> classNames, List<Link> links) {
+        int count = classNames.size();
+        if (count > MAX_CLASSES) {
+            return listed(classNames);
+        }
+        double centreX = WIDTH / 2.0;
+        double centreY = HEIGHT / 2.0;
+        // Four classes need a wider ring: the ones at the sides would otherwise sit on top of each other.
+        double radiusX = RADIUS * (count == 4 ? 1.22 : 1);
+        double radiusY = RADIUS * (count == 4 ? 1.15 : 1);
+
+        List<String> labels = new ArrayList<>();
+        double[] xs = new double[count];
+        double[] ys = new double[count];
+        for (int i = 0; i < count; i++) {
+            // Start at the top and go round; two classes sit left and right instead of top and bottom.
+            double angle = -Math.PI / 2 + i * 2 * Math.PI / Math.max(count, 1) + (count == 2 ? Math.PI / 2 : 0);
+            labels.add(shortName(classNames.get(i)));
+            xs[i] = centreX + radiusX * Math.cos(angle);
+            ys[i] = centreY + radiusY * Math.sin(angle);
+            // Keep a long name inside the drawing.
+            double half = pillWidth(labels.get(i)) / 2;
+            xs[i] = Math.max(half + 1, Math.min(WIDTH - half - 1, xs[i]));
+        }
+
+        String cycle = Family.CYCLE.hex();
+        String ink = Family.INK.hex();
+        StringBuilder svg = new StringBuilder();
+        svg.append("<svg viewBox=\"0 0 ")
+                .append(WIDTH)
+                .append(' ')
+                .append(HEIGHT)
+                .append("\" width=\"100%\" style=\"max-width:")
+                .append(WIDTH)
+                .append("px;font:11.5px sans-serif;\" role=\"img\" aria-label=\"")
+                .append(esc("A cycle of " + String.join(", ", labels)))
+                .append("\">\n<defs>\n");
+        svg.append(arrowhead(id + "-link", ink, 9, 0.45));
+        svg.append(arrowhead(id + "-cut", cycle, 11, 1));
+        svg.append("</defs>\n");
+        svg.append("<ellipse cx=\"")
+                .append(n(centreX))
+                .append("\" cy=\"")
+                .append(n(centreY))
+                .append("\" rx=\"")
+                .append(n(radiusX))
+                .append("\" ry=\"")
+                .append(n(radiusY))
+                .append("\" fill=\"none\" stroke=\"")
+                .append(Family.CYCLE_PALE.hex())
+                .append("\" stroke-width=\"10\"/>\n");
+
+        for (Link link : links) {
+            int from = classNames.indexOf(link.from());
+            int to = classNames.indexOf(link.to());
+            if (from < 0 || to < 0 || from == to) {
+                continue;
+            }
+            double dx = xs[to] - xs[from];
+            double dy = ys[to] - ys[from];
+            double length = Math.hypot(dx, dy);
+            // The curve bends to the left of its direction, so a pair of opposite links bend apart.
+            double normalX = -dy / length;
+            double normalY = dx / length;
+            double bend = count == 2 ? RADIUS * 0.95 : (length > RADIUS * 1.9 ? 26 : 20);
+            double controlX = (xs[from] + xs[to]) / 2 + normalX * bend;
+            double controlY = (ys[from] + ys[to]) / 2 + normalY * bend;
+            double[] start = pillEdge(xs[from], ys[from], controlX, controlY, pillWidth(labels.get(from)));
+            double[] end = pillEdge(xs[to], ys[to], controlX, controlY, pillWidth(labels.get(to)));
+
+            svg.append("<path d=\"M")
+                    .append(n(start[0]))
+                    .append(',')
+                    .append(n(start[1]))
+                    .append(" Q")
+                    .append(n(controlX))
+                    .append(',')
+                    .append(n(controlY))
+                    .append(' ')
+                    .append(n(end[0]))
+                    .append(',')
+                    .append(n(end[1]))
+                    .append("\" fill=\"none\" ");
+            if (link.cut()) {
+                svg.append("stroke=\"")
+                        .append(cycle)
+                        .append("\" stroke-width=\"2.8\" marker-end=\"url(#")
+                        .append(id)
+                        .append("-cut)\"/>\n");
+                double labelX = (start[0] + 2 * controlX + end[0]) / 4 + normalX * 13;
+                double labelY = (start[1] + 2 * controlY + end[1]) / 4 + normalY * 13 + 4;
+                svg.append("<text x=\"")
+                        .append(n(labelX))
+                        .append("\" y=\"")
+                        .append(n(labelY))
+                        .append("\" text-anchor=\"middle\" font-weight=\"bold\" fill=\"")
+                        .append(cycle)
+                        .append("\" stroke=\"#ffffff\" stroke-width=\"3\" paint-order=\"stroke\">&#9986; ")
+                        .append(link.uses())
+                        .append("</text>\n");
+            } else {
+                svg.append("stroke=\"")
+                        .append(ink)
+                        .append("\" stroke-opacity=\"0.45\" stroke-width=\"1.3\" marker-end=\"url(#")
+                        .append(id)
+                        .append("-link)\"/>\n");
+            }
+        }
+
+        for (int i = 0; i < count; i++) {
+            double width = pillWidth(labels.get(i));
+            svg.append("<rect x=\"")
+                    .append(n(xs[i] - width / 2))
+                    .append("\" y=\"")
+                    .append(n(ys[i] - PILL_HALF_HEIGHT))
+                    .append("\" width=\"")
+                    .append(n(width))
+                    .append("\" height=\"")
+                    .append(n(PILL_HALF_HEIGHT * 2))
+                    .append("\" rx=\"")
+                    .append(n(PILL_HALF_HEIGHT))
+                    .append("\" fill=\"")
+                    .append(Family.NEUTRAL.hex())
+                    .append("\" stroke=\"")
+                    .append(cycle)
+                    .append("\" stroke-width=\"1.4\"/>\n<text x=\"")
+                    .append(n(xs[i]))
+                    .append("\" y=\"")
+                    .append(n(ys[i] + 4))
+                    .append("\" text-anchor=\"middle\" fill=\"")
+                    .append(ink)
+                    .append("\">")
+                    .append(esc(labels.get(i)))
+                    .append("</text>\n");
+        }
+        svg.append("</svg>\n");
+        return svg.toString();
+    }
+
+    /** The name a reader needs: no package, and for a nested class no outer class either. */
+    static String shortName(String fullyQualifiedName) {
+        String name = fullyQualifiedName.substring(fullyQualifiedName.lastIndexOf('.') + 1);
+        return name.substring(name.lastIndexOf('$') + 1);
+    }
+
+    private static String listed(List<String> classNames) {
+        List<String> shown = new ArrayList<>();
+        for (String name : classNames.subList(0, MAX_CLASSES)) {
+            shown.add(shortName(name));
+        }
+        return "<div style=\"text-align:left;\">" + esc(String.join(", ", shown)) + ", and "
+                + (classNames.size() - MAX_CLASSES) + " more</div>\n";
+    }
+
+    private static double pillWidth(String label) {
+        return label.length() * CHAR_WIDTH + 14;
+    }
+
+    /** Where a line from a pill's centre towards a point leaves the pill, so arrows stop at its edge. */
+    private static double[] pillEdge(double x, double y, double towardsX, double towardsY, double pillWidth) {
+        double dx = towardsX - x;
+        double dy = towardsY - y;
+        double length = Math.hypot(dx, dy);
+        double unitX = dx / length;
+        double unitY = dy / length;
+        double reach = Math.min(
+                (pillWidth / 2 + 3) / Math.max(Math.abs(unitX), 1e-6),
+                (PILL_HALF_HEIGHT + 3) / Math.max(Math.abs(unitY), 1e-6));
+        return new double[] {x + unitX * reach, y + unitY * reach};
+    }
+
+    private static String arrowhead(String id, String colour, int size, double opacity) {
+        return "<marker id=\"" + id + "\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"" + size
+                + "\" markerHeight=\"" + size + "\" markerUnits=\"userSpaceOnUse\" orient=\"auto\">"
+                + "<path d=\"M0,0L10,5L0,10z\" fill=\"" + colour + "\" fill-opacity=\"" + opacity + "\"/></marker>\n";
+    }
+
+    private static String n(double value) {
+        return String.format(Locale.US, "%.1f", value);
+    }
+
+    private static String esc(String text) {
+        return text.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;");
+    }
+}
