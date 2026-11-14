@@ -398,7 +398,8 @@ public class SimpleHtmlReport {
                 classGraph.vertexSet().size(),
                 disharmonySpecs,
                 rankedDisharmoniesByAnchor,
-                rankedClassCycles));
+                cyclesForStartHere(
+                        rankedClassCycles, classRelationshipDisharmonies, packageRelationshipDisharmonies.size())));
 
         log.info("Generating HTML Report");
 
@@ -436,6 +437,50 @@ public class SimpleHtmlReport {
 
         log.debug(stringBuilder.toString());
         return stringBuilder;
+    }
+
+    /** Whether this report draws the class and package maps. The simple report does not. */
+    boolean hasMaps() {
+        return false;
+    }
+
+    /**
+     * Gathers what the start-here block shows about cycles: each class cycle with its classes and the uses
+     * between them, which of those uses the tool suggests cutting, and which cycle holds the priority 1 cut.
+     */
+    StartHereSummary.Cycles cyclesForStartHere(
+            List<RankedCycle> rankedClassCycles,
+            List<RankedDisharmony> classRelationshipDisharmonies,
+            int packageLinksToCut) {
+        DefaultWeightedEdge firstCut = classRelationshipDisharmonies.stream()
+                .filter(d -> d.getPriority() != null && d.getPriority() == 1)
+                .map(RankedDisharmony::getEdge)
+                .findFirst()
+                .orElse(null);
+        List<StartHereSummary.CycleCard> cards = new ArrayList<>();
+        for (RankedCycle cycle : rankedClassCycles) {
+            List<CycleRingSvg.Link> links = new ArrayList<>();
+            boolean holdsFirstCut = false;
+            for (DefaultWeightedEdge edge : cycle.getEdgeSet()) {
+                links.add(new CycleRingSvg.Link(
+                        classGraph.getEdgeSource(edge).getName(),
+                        classGraph.getEdgeTarget(edge).getName(),
+                        (int) classGraph.getEdgeWeight(edge),
+                        classRelationshipsToRemove.contains(edge)));
+                holdsFirstCut = holdsFirstCut || edge.equals(firstCut);
+            }
+            // The same order on every run: the sets these come from do not keep one.
+            links.sort(Comparator.comparing(CycleRingSvg.Link::from).thenComparing(CycleRingSvg.Link::to));
+            List<String> classes = new ArrayList<>(cycle.getVertexSet());
+            Collections.sort(classes);
+            cards.add(new StartHereSummary.CycleCard(cycle.getCycleName(), classes, links, holdsFirstCut));
+        }
+        return new StartHereSummary.Cycles(
+                cards,
+                classRelationshipsToRemove.size(),
+                packageCycles == null ? 0 : packageCycles.size(),
+                packageLinksToCut,
+                hasMaps());
     }
 
     /**

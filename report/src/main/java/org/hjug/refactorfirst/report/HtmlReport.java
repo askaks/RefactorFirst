@@ -475,6 +475,11 @@ public class HtmlReport extends SimpleHtmlReport {
         return "<title>Refactor First Report for " + projectName + " " + projectVersion + " </title>\n";
     }
 
+    @Override
+    boolean hasMaps() {
+        return true;
+    }
+
     void renderClassMapMenu(StringBuilder stringBuilder) {
         stringBuilder.append("<li><a href=\"#CLASSMAP\">Class Map</a></li>\n");
     }
