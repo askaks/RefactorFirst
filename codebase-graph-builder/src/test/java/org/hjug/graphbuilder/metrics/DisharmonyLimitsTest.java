@@ -71,4 +71,30 @@ class DisharmonyLimitsTest {
         assertEquals("share of the parent's members it uses (0 to 1)", DisharmonyLimits.plainName("BUR"));
         assertEquals("SomethingNew", DisharmonyLimits.plainName("SomethingNew"), "an unknown metric keeps its name");
     }
+
+    @Test
+    void givenClassComplexity_whenItsLevelsAreRead_thenTheyAreTheDetectorsThreeInOrder() {
+        java.util.List<DisharmonyLimits.Level> levels = DisharmonyLimits.levels("WMC");
+        assertEquals(
+                java.util.List.of("average", "high", "very high"),
+                levels.stream().map(DisharmonyLimits.Level::name).toList());
+        assertEquals(
+                java.util.List.of(
+                        (double) DisharmonyDetector.WMC_AVERAGE, (double) DisharmonyDetector.WMC_HIGH, (double)
+                                DisharmonyDetector.WMC_VERY_HIGH),
+                levels.stream().map(DisharmonyLimits.Level::value).toList());
+    }
+
+    @Test
+    void givenAMeasureWithOneNamedPoint_whenItsLevelsAreRead_thenThereIsOne() {
+        assertEquals(
+                java.util.List.of(new DisharmonyLimits.Level("deep", DisharmonyDetector.MAXNESTING_DEEP)),
+                DisharmonyLimits.levels("MAXNESTING"));
+    }
+
+    @Test
+    void givenAMeasureWithNoNamedPoints_whenItsLevelsAreRead_thenThereAreNone() {
+        assertTrue(DisharmonyLimits.levels("CDISP").isEmpty());
+        assertTrue(DisharmonyLimits.levels(null).isEmpty());
+    }
 }

@@ -125,6 +125,35 @@ class CycleRingSvgTest {
         assertFalse(source.contains("HtmlReport."));
     }
 
+    @Test
+    void givenSixOrMoreClasses_whenDrawn_thenEachIsADotWithItsNameOutsideTheRing() {
+        List<String> names = new ArrayList<>();
+        List<Link> links = new ArrayList<>();
+        for (int i = 0; i < 8; i++) {
+            names.add("app.LongTermModelPart" + i);
+        }
+        for (int i = 0; i < 8; i++) {
+            links.add(new Link(names.get(i), names.get((i + 1) % 8), 1, i == 0));
+        }
+
+        String svg = CycleRingSvg.render("c1", names, links);
+
+        assertTrue(svg.startsWith("<svg"), svg);
+        assertEquals(0, count(svg, "<rect"), "no name boxes to overlap");
+        assertEquals(8, count(svg, "class=\"rf-dot\""), svg);
+        assertEquals(8, count(svg, "marker-end="), "one arrow per link");
+        assertTrue(svg.contains("text-anchor=\"start\"") && svg.contains("text-anchor=\"end\""), svg);
+        assertTrue(svg.contains(">LongTermModelPart3</text>"), svg);
+    }
+
+    @Test
+    void givenFiveClasses_whenDrawn_thenTheyKeepTheirNameBoxes() {
+        List<String> names = List.of("app.A", "app.B", "app.C", "app.D", "app.E");
+        String svg = CycleRingSvg.render("c1", names, List.of());
+        assertEquals(5, count(svg, "<rect"));
+        assertEquals(0, count(svg, "class=\"rf-dot\""));
+    }
+
     private static int count(String text, String part) {
         return text.split(java.util.regex.Pattern.quote(part), -1).length - 1;
     }

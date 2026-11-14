@@ -435,6 +435,9 @@ public class SimpleHtmlReport {
             stringBuilder.append(renderCycles(rankedClassCycles, repoUrl, codebaseGraphDTO));
         }
 
+        // Last: what each number means and where its limit comes from. The "why?" links land here.
+        stringBuilder.append(NumbersGuide.render());
+
         log.debug(stringBuilder.toString());
         return stringBuilder;
     }
@@ -522,6 +525,7 @@ public class SimpleHtmlReport {
         if (hasCycles) {
             navLink(sb, "CYCLES", "Class Cycles");
         }
+        navLink(sb, NumbersGuide.SECTION_ANCHOR, "What the numbers mean");
         sb.append("</div>\n</details>\n");
         sb.append("<a href=\"#\" title=\"Back to the top of the report\" style=\"")
                 .append(pill)
@@ -1208,7 +1212,11 @@ public class SimpleHtmlReport {
             String line = "<strong>" + value + "</strong> " + escapeHtmlLabel(DisharmonyLimits.plainName(m.getName()));
             lines.add(line
                     + DisharmonyLimits.of(rd.getDisharmonyType(), m.getName())
-                            .map(l -> " <span style=\"color:#666;\">(flagged " + l.describe() + ")</span>")
+                            .map(l -> " <span style=\"color:#666;\">(flagged " + l.describe()
+                                    + (NumbersGuide.has(m.getName())
+                                            ? ", " + NumbersGuide.whyLink(m.getName(), "why?")
+                                            : "")
+                                    + ")</span>")
                             .orElse(""));
         }
         return String.join("<br/>", lines);

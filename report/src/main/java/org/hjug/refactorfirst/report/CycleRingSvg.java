@@ -17,7 +17,15 @@ import org.hjug.refactorfirst.report.ReportPalette.Family;
 final class CycleRingSvg {
 
     /** A cycle with more classes than this is listed by name: a ring that crowded cannot be read. */
-    static final int MAX_CLASSES = 8;
+    static final int MAX_CLASSES = 12;
+
+    /** From this many classes, each class is a dot on the ring with its name outside it, so names cannot overlap. */
+    static final int OUTSIDE_FROM = 6;
+
+    private static final int WIDE_WIDTH = 680;
+    private static final int WIDE_HEIGHT = 300;
+    private static final double WIDE_RADIUS = 92;
+    private static final double DOT = 6;
 
     static final int WIDTH = 318;
     static final int HEIGHT = 214;
@@ -51,35 +59,43 @@ final class CycleRingSvg {
         if (count > MAX_CLASSES) {
             return listed(classNames);
         }
-        double centreX = WIDTH / 2.0;
-        double centreY = HEIGHT / 2.0;
+        boolean outside = count >= OUTSIDE_FROM;
+        int width = outside ? WIDE_WIDTH : WIDTH;
+        int height = outside ? WIDE_HEIGHT : HEIGHT;
+        double radius = outside ? WIDE_RADIUS : RADIUS;
+        double centreX = width / 2.0;
+        double centreY = height / 2.0;
         // Four classes need a wider ring: the ones at the sides would otherwise sit on top of each other.
-        double radiusX = RADIUS * (count == 4 ? 1.22 : 1);
-        double radiusY = RADIUS * (count == 4 ? 1.15 : 1);
+        double radiusX = radius * (count == 4 ? 1.22 : 1);
+        double radiusY = radius * (count == 4 ? 1.15 : 1);
 
         List<String> labels = new ArrayList<>();
         double[] xs = new double[count];
         double[] ys = new double[count];
+        double[] angles = new double[count];
         for (int i = 0; i < count; i++) {
             // Start at the top and go round; two classes sit left and right instead of top and bottom.
             double angle = -Math.PI / 2 + i * 2 * Math.PI / Math.max(count, 1) + (count == 2 ? Math.PI / 2 : 0);
+            angles[i] = angle;
             labels.add(shortName(classNames.get(i)));
             xs[i] = centreX + radiusX * Math.cos(angle);
             ys[i] = centreY + radiusY * Math.sin(angle);
-            // Keep a long name inside the drawing.
-            double half = pillWidth(labels.get(i)) / 2;
-            xs[i] = Math.max(half + 1, Math.min(WIDTH - half - 1, xs[i]));
+            if (!outside) {
+                // Keep a long name inside the drawing.
+                double half = pillWidth(labels.get(i)) / 2;
+                xs[i] = Math.max(half + 1, Math.min(width - half - 1, xs[i]));
+            }
         }
 
         String cycle = Family.CYCLE.hex();
         String ink = Family.INK.hex();
         StringBuilder svg = new StringBuilder();
         svg.append("<svg viewBox=\"0 0 ")
-                .append(WIDTH)
+                .append(width)
                 .append(' ')
-                .append(HEIGHT)
+                .append(height)
                 .append("\" width=\"100%\" style=\"max-width:")
-                .append(WIDTH)
+                .append(width)
                 .append("px;font:11.5px sans-serif;\" role=\"img\" aria-label=\"")
                 .append(esc("A cycle of " + String.join(", ", labels)))
                 .append("\">\n<defs>\n");
@@ -110,11 +126,15 @@ final class CycleRingSvg {
             // The curve bends to the left of its direction, so a pair of opposite links bend apart.
             double normalX = -dy / length;
             double normalY = dx / length;
-            double bend = count == 2 ? RADIUS * 0.95 : (length > RADIUS * 1.9 ? 26 : 20);
+            double bend = count == 2 ? radius * 0.95 : (length > radius * 1.9 ? 26 : 20);
             double controlX = (xs[from] + xs[to]) / 2 + normalX * bend;
             double controlY = (ys[from] + ys[to]) / 2 + normalY * bend;
-            double[] start = pillEdge(xs[from], ys[from], controlX, controlY, pillWidth(labels.get(from)));
-            double[] end = pillEdge(xs[to], ys[to], controlX, controlY, pillWidth(labels.get(to)));
+            double[] start = outside
+                    ? dotEdge(xs[from], ys[from], controlX, controlY)
+                    : pillEdge(xs[from], ys[from], controlX, controlY, pillWidth(labels.get(from)));
+            double[] end = outside
+                    ? dotEdge(xs[to], ys[to], controlX, controlY)
+                    : pillEdge(xs[to], ys[to], controlX, controlY, pillWidth(labels.get(to)));
 
             svg.append("<path d=\"M")
                     .append(n(start[0]))
@@ -155,14 +175,42 @@ final class CycleRingSvg {
             }
         }
 
-        for (int i = 0; i < count; i++) {
-            double width = pillWidth(labels.get(i));
+        for (int i = 0; outside && i < count; i++) {
+            double cos = Math.cos(angles[i]);
+            double sin = Math.sin(angles[i]);
+            String anchor = Math.abs(cos) < 0.3 ? "middle" : cos > 0 ? "start" : "end";
+            // A name at the very top or bottom sits above or below its dot; the rest sit beside theirs.
+            double lift = sin > 0.9 ? 9 : sin < -0.9 ? -3 : 4;
+            svg.append("<circle class=\"rf-dot\" cx=\"")
+                    .append(n(xs[i]))
+                    .append("\" cy=\"")
+                    .append(n(ys[i]))
+                    .append("\" r=\"")
+                    .append(n(DOT))
+                    .append("\" fill=\"")
+                    .append(Family.NEUTRAL.hex())
+                    .append("\" stroke=\"")
+                    .append(cycle)
+                    .append("\" stroke-width=\"2\"/>\n<text x=\"")
+                    .append(n(xs[i] + (DOT + 8) * cos))
+                    .append("\" y=\"")
+                    .append(n(ys[i] + (DOT + 8) * sin + lift))
+                    .append("\" text-anchor=\"")
+                    .append(anchor)
+                    .append("\" fill=\"")
+                    .append(ink)
+                    .append("\">")
+                    .append(esc(labels.get(i)))
+                    .append("</text>\n");
+        }
+        for (int i = 0; !outside && i < count; i++) {
+            double pill = pillWidth(labels.get(i));
             svg.append("<rect x=\"")
-                    .append(n(xs[i] - width / 2))
+                    .append(n(xs[i] - pill / 2))
                     .append("\" y=\"")
                     .append(n(ys[i] - PILL_HALF_HEIGHT))
                     .append("\" width=\"")
-                    .append(n(width))
+                    .append(n(pill))
                     .append("\" height=\"")
                     .append(n(PILL_HALF_HEIGHT * 2))
                     .append("\" rx=\"")
@@ -183,6 +231,14 @@ final class CycleRingSvg {
         }
         svg.append("</svg>\n");
         return svg.toString();
+    }
+
+    /** Where a link meets a dot: on the dot's edge, on the side facing the curve's control point. */
+    private static double[] dotEdge(double x, double y, double towardsX, double towardsY) {
+        double dx = towardsX - x;
+        double dy = towardsY - y;
+        double length = Math.max(Math.hypot(dx, dy), 0.001);
+        return new double[] {x + dx / length * (DOT + 2), y + dy / length * (DOT + 2)};
     }
 
     /** The name a reader needs: no package, and for a nested class no outer class either. */

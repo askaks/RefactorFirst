@@ -28,7 +28,7 @@ class ReportKeyTest {
         assertTrue(key.contains("nothing found"), key);
         assertTrue(key.contains(Family.CYCLE.hex()));
         assertTrue(key.contains(Family.CYCLE_PALE.hex()));
-        assertTrue(key.contains(Family.CYCLE.mark(true)));
+        assertTrue(key.contains(Family.CYCLE.mark()));
         assertFalse(key.contains(Family.FIX_FIRST.hex()), "nothing on the maps is red, so the map key has no red");
     }
 
@@ -36,12 +36,36 @@ class ReportKeyTest {
     void givenTheFindingsKey_whenRendered_thenEveryTagFamilyHasALineWithItsMeaning() {
         String key = ReportKey.forFindings();
 
-        for (Family family :
-                List.of(Family.FIX_FIRST, Family.CYCLE, Family.CLASS_FINDING, Family.METHOD_FINDING, Family.HOTSPOT)) {
+        for (Family family : List.of(
+                Family.CYCLE,
+                Family.GOD,
+                Family.BRAIN,
+                Family.BRAIN_LIGHT,
+                Family.ENVY,
+                Family.COUPLING,
+                Family.QUIET,
+                Family.HOTSPOT)) {
             assertTrue(key.contains(family.hex()), family + " colour");
             assertTrue(key.contains(family.meaning()), family + " meaning");
         }
-        assertTrue(key.contains("solid"), "says what solid and outline tags mean");
+        assertTrue(key.contains("&#9724; a class") && key.contains("&#9670; a method"), "says what the marks mean");
+        assertFalse(key.contains("outlined"), "there are no outlined tags any more");
+        assertFalse(key.contains(Family.FIX_FIRST.hex()), "fix first names itself and needs no key entry");
+    }
+
+    @Test
+    void givenASmellTag_whenRendered_thenItIsFilledLeadsWithTheLevelMarkAndNeverWraps() {
+        String god = ReportKey.tag(Family.GOD, false, "God Class");
+        assertTrue(god.contains("background:#d4a017"), god);
+        assertTrue(god.contains("color:#2b2b2b"), "dark text on gold: " + god);
+        assertTrue(god.contains("&#9724; God Class"), god);
+        assertTrue(god.contains("white-space:nowrap"), god);
+
+        String method = ReportKey.tag(Family.BRAIN_LIGHT, true, "Brain Method");
+        assertTrue(method.contains("&#9670; Brain Method"), method);
+
+        String fixFirst = ReportKey.tag(Family.FIX_FIRST, true, "fix first");
+        assertTrue(fixFirst.contains("&#9873; fix first"), "fix first keeps its own mark: " + fixFirst);
     }
 
     @Test
@@ -146,7 +170,7 @@ class ReportKeyTest {
     void givenACycleCount_whenDrawnAsACell_thenAnyCountAboveZeroIsFlaggedInTheCycleColour() {
         String flagged = ReportKey.cycleCountCell("2");
         assertTrue(flagged.contains("background:" + Family.CYCLE_PALE.hex()), flagged);
-        assertTrue(flagged.contains("2 <span") && flagged.contains(Family.CYCLE.mark(true)), flagged);
+        assertTrue(flagged.contains("2 <span") && flagged.contains(Family.CYCLE.mark()), flagged);
 
         assertEquals("<td align=\"right\">0</td>\n", ReportKey.cycleCountCell("0"));
         assertEquals("<td align=\"right\">null</td>\n", ReportKey.cycleCountCell("null"), "no count, no flag");

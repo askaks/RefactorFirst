@@ -25,11 +25,12 @@ class FindingsTableTest {
         String why = SimpleHtmlReport.whyFinding(godClass(1));
 
         assertTrue(why.contains("<strong>9</strong> uses of other classes' data"), why);
-        assertTrue(why.contains("(flagged over 5)"), why);
+        assertTrue(why.contains("(flagged over 5, <a href=\"#WHY_ATFD\""), why);
         assertTrue(why.contains("<strong>61</strong> complexity of all its methods"), why);
-        assertTrue(why.contains("(flagged 47 or more)"), why);
+        assertTrue(why.contains("(flagged 47 or more, <a href=\"#WHY_WMC\""), why);
         assertTrue(why.contains("<strong>0.20</strong> cohesion (0 to 1)"), why);
-        assertTrue(why.contains("(flagged under 0.33)"), why);
+        assertTrue(why.contains("(flagged under 0.33, <a href=\"#WHY_TCC\""), why);
+        assertEquals(3, why.split("why\\?</a>", -1).length - 1, "one why link per limit");
     }
 
     @Test

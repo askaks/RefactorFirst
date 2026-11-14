@@ -42,12 +42,11 @@ class StartHereSummaryTest {
 
         String html = render(List.of(small, large));
 
-        assertTrue(html.contains("Cycles found: 2"), html);
         assertTrue(html.indexOf("<strong>Large</strong>") < html.indexOf("<strong>Small</strong>"), "largest first");
         assertEquals(2, html.split("<svg", -1).length - 1, "one ring per cycle");
-        assertTrue(html.indexOf("Cycles found") < html.indexOf("Other places to look first"), "cycles come first");
-        assertTrue(
-                html.indexOf("dependency cycles") < html.indexOf("classes doing too much"), "and so does their tile");
+        assertTrue(html.indexOf("rf-panel-cycles") < html.indexOf("Other places to look first"), "cycles come first");
+        assertTrue(html.indexOf("dependency cycles") < html.indexOf("doing too much"), "and so does their tab");
+        assertTrue(html.contains("id=\"rf-tab-cycles\" checked"), "the cycles tab is the one shown");
         assertEquals(
                 List.of("Billing"),
                 StartHereSummary.pick(SimpleHtmlReport.DISHARMONY_SPECS, findings).stream()
@@ -66,7 +65,8 @@ class StartHereSummaryTest {
                 new StartHereSummary.Cycles(List.of(cycle("app.Loop", 3, true)), 6, 2, 4, true));
 
         assertTrue(html.contains("Pink always means a cycle"));
-        assertTrue(html.contains("Red means fix first."));
+        assertFalse(html.contains("Red means fix first"), "fix first names itself and needs no legend");
+        assertTrue(html.contains("href=\"#WHY_CYCLES\""), "and it links to what cycles mean");
         assertTrue(html.contains("class=\"rf-spin\""), "the cycle mark turns");
         assertTrue(html.contains("prefers-reduced-motion"), "and stands still when asked to");
         for (String anchor : List.of("CLASSMAP", "WHY_CLASSES", "CYCLES", "CLASSEDGES", "PACKAGEMAP", "PACKAGEEDGES")) {
@@ -102,7 +102,7 @@ class StartHereSummaryTest {
 
         assertEquals(StartHereSummary.MAX_CYCLE_CARDS, html.split("<svg", -1).length - 1);
         assertTrue(html.contains(">3 more</a>"), html);
-        assertTrue(html.contains("Cycles found: 7"));
+        assertTrue(html.contains(" 7</b>dependency cycles</label>"), "the tab counts them all: " + html);
     }
 
     @Test
@@ -220,10 +220,10 @@ class StartHereSummaryTest {
                 new StartHereSummary.Cycles(List.of(cycle("C", 3, false)), 1, 0, 0, false));
 
         assertTrue(html.contains("id=\"START_HERE\""));
-        assertTrue(html.contains("<b>3</b></span><br/><span>classes doing too much</span>"));
-        assertTrue(html.contains(" 1</b></span><br/><span>dependency cycles</span>"), html);
-        assertTrue(html.contains("<b>1</b></span><br/><span>over-long, tangled methods</span>"));
-        assertTrue(html.contains("<b>2,865</b></span><br/><span>classes analysed</span>"));
+        assertTrue(html.contains(" 3</b>classes doing too much</label>"), html);
+        assertTrue(html.contains(" 1</b>dependency cycles</label>"), html);
+        assertTrue(html.contains(" 1</b>over-long, tangled method</label>"), html);
+        assertTrue(html.contains("<b>2,865</b>classes analysed</div>"), html);
         assertTrue(html.contains("Changed in 24 commits"));
     }
 
@@ -276,15 +276,14 @@ class StartHereSummaryTest {
             byName.put(pick.name(), pick);
         }
 
-        assertEquals(ReportPalette.Family.CLASS_FINDING, byName.get("Billing").family());
-        assertTrue(byName.get("Billing").serious());
-        assertEquals(
-                ReportPalette.Family.CLASS_FINDING, byName.get("Aggregator").family());
+        assertEquals(ReportPalette.Family.GOD, byName.get("Billing").family());
+        assertFalse(byName.get("Billing").methodLevel());
+        assertEquals(ReportPalette.Family.BRAIN, byName.get("Aggregator").family());
         assertEquals(ReportPalette.Family.HOTSPOT, byName.get("Busy.run()").family());
     }
 
     @Test
-    void givenMethodPicks_whenPicked_thenBrainMethodIsSolidAndFeatureEnvyIsAnOutline() {
+    void givenMethodPicks_whenPicked_thenFeatureEnvyHasItsOwnFamilyAndIsMethodLevel() {
         findings.put("BRAIN_METHOD", List.of(method(DisharmonyTypes.BRAIN_METHOD, "app.Parser", "parse()", 1, 30)));
         findings.put(
                 "FEATURE_ENVY",
@@ -298,8 +297,8 @@ class StartHereSummaryTest {
                 .findFirst()
                 .orElseThrow();
 
-        assertEquals(ReportPalette.Family.METHOD_FINDING, envy.family());
-        assertFalse(envy.serious(), "Feature Envy is a milder finding, so its tag is an outline");
+        assertEquals(ReportPalette.Family.ENVY, envy.family());
+        assertTrue(envy.methodLevel(), "so its tag leads with the diamond");
     }
 
     @Test
@@ -323,22 +322,128 @@ class StartHereSummaryTest {
 
         String html = render(List.of(cycle("app.Loop", 4, false)));
 
-        // Solid tag: the family colour is the background, with the family's solid mark.
-        assertTrue(html.contains("background:" + ReportPalette.Family.CLASS_FINDING.hex()));
-        assertTrue(html.contains(ReportPalette.Family.CLASS_FINDING.mark(true) + " " + DisharmonyTypes.GOD_CLASS));
-        // Outline tag: the family colour is the border and the text, with the hollow mark.
-        assertTrue(html.contains("border:1.5px solid " + ReportPalette.Family.METHOD_FINDING.hex()));
-        assertTrue(html.contains(ReportPalette.Family.METHOD_FINDING.mark(false) + " " + DisharmonyTypes.FEATURE_ENVY));
-        assertTrue(html.contains("color:" + ReportPalette.Family.CYCLE.hex()), "the cycles heading and tile");
+        // Every tag is filled: the kind's colour is the background, and the mark says the level.
+        assertTrue(html.contains("background:" + ReportPalette.Family.GOD.hex()));
+        assertTrue(html.contains(ReportPalette.levelMark(false) + " " + DisharmonyTypes.GOD_CLASS));
+        assertTrue(html.contains("background:" + ReportPalette.Family.ENVY.hex()));
+        assertTrue(html.contains(ReportPalette.levelMark(true) + " " + DisharmonyTypes.FEATURE_ENVY));
+        assertTrue(html.contains(ReportPalette.Family.CYCLE.hex()), "the cycles tab and panel");
         assertTrue(html.contains("background:" + ReportPalette.Family.HOTSPOT.hex()));
-        assertTrue(html.contains(ReportPalette.Family.HOTSPOT.mark(true) + " Hotspot"));
-        // Fix first sits beside the kind's tag, once: only Billing is priority 1 and not the hotspot.
-        assertEquals(1, html.split(ReportPalette.Family.FIX_FIRST.mark(true) + " fix first", -1).length - 1);
+        assertTrue(html.contains(ReportPalette.Family.HOTSPOT.mark() + " Hotspot"));
+        // Fix first sits beside the kind's tag: on Billing's card in the classes tab and on its line in the list.
+        assertEquals(2, html.split(ReportPalette.Family.FIX_FIRST.mark() + " fix first", -1).length - 1);
         assertTrue(html.contains("background:" + ReportPalette.Family.FIX_FIRST.hex()));
         // The old hand-typed colours are gone: brown for cycles, blue for hotspots, green for advice.
         assertFalse(html.contains("#b26a00"));
-        assertFalse(html.contains("#1565c0"));
         assertFalse(html.contains("#2e7d32"));
+    }
+
+    @Test
+    void givenCounts_whenRendered_thenEachIsATabAndNoScriptIsUsed() {
+        findings.put("GOD", List.of(god("app.Billing", 1, 24)));
+        findings.put("BRAIN_METHOD", List.of(method(DisharmonyTypes.BRAIN_METHOD, "app.Parser", "parse()", 1, 3)));
+
+        String html = render(List.of(cycle("app.Loop", 3, false)));
+
+        assertEquals(3, count(html, "type=\"radio\" name=\"rf-tab\""), html);
+        for (String name : List.of("cycles", "classes", "methods")) {
+            assertTrue(html.contains("<label for=\"rf-tab-" + name + "\">"), name);
+            assertTrue(html.contains("id=\"rf-panel-" + name + "\""), name);
+        }
+        assertTrue(html.contains("class doing too much"), "one class: singular");
+        assertFalse(html.contains("<script"), "the tabs are plain CSS");
+        assertFalse(html.contains("onclick"), html);
+    }
+
+    @Test
+    void givenNoCycles_whenRendered_thenTheFirstTabWithSomethingInItIsShown() {
+        findings.put("BRAIN_METHOD", List.of(method(DisharmonyTypes.BRAIN_METHOD, "app.Parser", "parse()", 1, 3)));
+
+        String html = render(List.of());
+
+        assertTrue(html.contains("id=\"rf-tab-methods\" checked"), html);
+        assertTrue(html.contains("No dependency cycles found."), html);
+        assertTrue(html.contains("No classes doing too much found."), html);
+    }
+
+    @Test
+    void givenAGodClassWithNumbers_whenRendered_thenItsCardDrawsEachNumberAgainstItsLimitAndLinksToWhy() {
+        findings.put("GOD", List.of(withMetrics(DisharmonyTypes.GOD_CLASS, "app.Estimator", null, 1, 7, 136, 0.32)));
+        findings.put(
+                "BRAIN_METHOD",
+                List.of(
+                        method(DisharmonyTypes.BRAIN_METHOD, "app.Estimator", "estimate(Request,boolean)", 1, 3),
+                        method(DisharmonyTypes.BRAIN_METHOD, "app.Estimator", "reverse(Request)", 2, 3)));
+
+        String html = render(List.of());
+        String panel = html.substring(html.indexOf("id=\"rf-panel-classes\""), html.indexOf("id=\"rf-panel-methods\""));
+
+        assertTrue(panel.contains(">Estimator</a>"), panel);
+        assertEquals(3, count(panel, "class=\"rf-bullet\""), "one bullet graph per God Class number");
+        assertTrue(panel.contains("<strong>2.9&times;</strong> the limit"), panel);
+        assertTrue(panel.contains("just over the limit of 5"), panel);
+        assertTrue(panel.contains("short of the limit of 0.33"), panel);
+        assertTrue(panel.contains("href=\"#WHY_WMC\"") && panel.contains("why 47?"), panel);
+        assertTrue(panel.contains("Also here:"), panel);
+        assertTrue(
+                panel.contains(DisharmonyTypes.BRAIN_METHOD + " \u00d72"),
+                "two brain methods in the same file: " + panel);
+        assertTrue(html.contains("id=\"rf-tab-classes\" checked"), "no cycles, so the classes tab is shown");
+    }
+
+    @Test
+    void givenMoreMethodsThanCards_whenRendered_thenTheRestAreALinkToTheTable() {
+        List<RankedDisharmony> methods = new java.util.ArrayList<>();
+        for (int i = 1; i <= 5; i++) {
+            methods.add(method(DisharmonyTypes.BRAIN_METHOD, "app.Parser" + i, "parse" + i + "(String)", i, 3));
+        }
+        findings.put("BRAIN_METHOD", methods);
+
+        String html = render(List.of());
+        String panel = html.substring(html.indexOf("id=\"rf-panel-methods\""));
+
+        assertTrue(panel.contains("and <a href=\"#BRAIN_METHOD\">2 more</a>."), panel);
+        assertTrue(panel.contains(">parse1</a>"), "the card title drops the parameter list: " + panel);
+    }
+
+    @Test
+    void givenLinksToCut_whenTheCutLineIsWritten_thenItGivesTheTotalToMove() {
+        assertEquals("cut 1 link \u00b7 1 use to move", StartHereSummary.cutsText(cycle("app.Loop", 3, false)));
+        List<String> members = List.of("a.A", "a.B");
+        StartHereSummary.CycleCard two = new StartHereSummary.CycleCard(
+                "a.A",
+                members,
+                List.of(new CycleRingSvg.Link("a.A", "a.B", 23, true), new CycleRingSvg.Link("a.B", "a.A", 7, true)),
+                false);
+        assertEquals("cut 2 links \u00b7 30 uses to move", StartHereSummary.cutsText(two));
+    }
+
+    private static int count(String text, String part) {
+        return text.split(java.util.regex.Pattern.quote(part), -1).length - 1;
+    }
+
+    private static RankedDisharmony withMetrics(
+            String type, String className, String signature, int priority, double atfd, double wmc, double tcc) {
+        String path = "src/" + className.replace('.', '/') + ".java";
+        DisharmonyInstance instance = new DisharmonyInstance(
+                type,
+                className,
+                path,
+                "app",
+                signature,
+                List.of(
+                        new org.hjug.graphbuilder.metrics.DisharmonyMetric(
+                                "ATFD", atfd, org.hjug.graphbuilder.metrics.DisharmonyMetric.Direction.ASCENDING),
+                        new org.hjug.graphbuilder.metrics.DisharmonyMetric(
+                                "WMC", wmc, org.hjug.graphbuilder.metrics.DisharmonyMetric.Direction.ASCENDING),
+                        new org.hjug.graphbuilder.metrics.DisharmonyMetric(
+                                "TCC", tcc, org.hjug.graphbuilder.metrics.DisharmonyMetric.Direction.DESCENDING)));
+        instance.setOverallRank(1);
+        ScmLogInfo log = new ScmLogInfo(path, className, 1, 2, 5);
+        log.setChangePronenessRank(1);
+        RankedDisharmony ranked = new RankedDisharmony(instance, log);
+        ranked.setPriority(priority);
+        return ranked;
     }
 
     private String render(List<StartHereSummary.CycleCard> cycles) {

@@ -2,9 +2,11 @@ package org.hjug.refactorfirst.report;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import org.hjug.refactorfirst.report.ReportPalette.Family;
 import org.junit.jupiter.api.Test;
@@ -16,88 +18,104 @@ class ReportPaletteTest {
         assertEquals("#c62828", Family.FIX_FIRST.hex());
         assertEquals("#c2188f", Family.CYCLE.hex());
         assertEquals("#f7cfe9", Family.CYCLE_PALE.hex());
-        assertEquals("#6a3fa0", Family.CLASS_FINDING.hex());
-        assertEquals("#8a5a00", Family.METHOD_FINDING.hex());
+        assertEquals("#6cac3a", Family.SMELL.hex());
+        assertEquals("#d4a017", Family.GOD.hex());
+        assertEquals("#6a3fa0", Family.BRAIN.hex());
+        assertEquals("#8f6cc4", Family.BRAIN_LIGHT.hex());
+        assertEquals("#12805c", Family.ENVY.hex());
+        assertEquals("#7a4a1e", Family.COUPLING.hex());
+        assertEquals("#5f6b7a", Family.QUIET.hex());
         assertEquals("#f08c00", Family.HOTSPOT.hex());
         assertEquals("#ffffff", Family.NEUTRAL.hex());
         assertEquals("#2b2b2b", Family.INK.hex());
     }
 
     @Test
-    void givenAllFamilies_whenColoursAreCompared_thenNoTwoShareOne() {
+    void givenEveryFamily_whenTheirColoursAreCompared_thenNoTwoShareOne() {
         Set<String> seen = new HashSet<>();
         for (Family family : Family.values()) {
-            assertTrue(seen.add(family.hex()), family + " repeats " + family.hex());
+            assertTrue(seen.add(family.hex()), family + " repeats a colour");
         }
     }
 
     @Test
-    void givenAllFamilies_whenColoursAreRead_thenNoneIsBlueOrGreen() {
-        // Blue is kept for links and green reads as "fine", so no finding may use either.
+    void givenAGodClassAndABrainClass_whenAskedForTheirFamilies_thenTheyDiffer() {
+        assertEquals(Family.GOD, ReportPalette.forFinding("GOD"));
+        assertNotEquals(
+                ReportPalette.forFinding("GOD").hex(),
+                ReportPalette.forFinding("BRAIN_CLASS").hex());
+    }
+
+    @Test
+    void givenABrainClassAndABrainMethod_whenAskedForTheirFamilies_thenTheyAreTheDarkAndLightOfOneHue() {
+        assertEquals(Family.BRAIN, ReportPalette.forFinding("BRAIN_CLASS"));
+        assertEquals(Family.BRAIN_LIGHT, ReportPalette.forFinding("BRAIN_METHOD"));
+    }
+
+    @Test
+    void givenTheCouplingSmells_whenAskedForTheirFamilies_thenTheyShareOne() {
+        for (String anchor : List.of("INTENSIVE_COUPLING", "DISPERSED_COUPLING", "SHOTGUN_SURGERY")) {
+            assertEquals(Family.COUPLING, ReportPalette.forFinding(anchor), anchor);
+        }
+    }
+
+    @Test
+    void givenACommonOrUnknownSmell_whenAskedForItsFamily_thenItIsTheQuietOne() {
+        for (String anchor : List.of("DATA_CLASS", "RPB", "TB", "SIG_DUP", "SOMETHING_NEW")) {
+            assertEquals(Family.QUIET, ReportPalette.forFinding(anchor), anchor);
+        }
+        assertEquals(Family.QUIET, ReportPalette.forFinding(null));
+        assertEquals(Family.ENVY, ReportPalette.forFinding("FEATURE_ENVY"));
+    }
+
+    @Test
+    void givenEveryFamily_whenItsColourIsRead_thenOnlySmellAndEnvyAreGreenAndNoneIsBlue() {
         for (Family family : Family.values()) {
-            int rgb = Integer.parseInt(family.hex().substring(1), 16);
-            int red = rgb >> 16 & 0xff;
-            int green = rgb >> 8 & 0xff;
-            int blue = rgb & 0xff;
-            boolean grey = red == green && green == blue;
-            boolean greenish = green > red && green >= blue;
-            boolean bluish = blue > red && green >= red;
-            assertFalse(!grey && (greenish || bluish), family + " reads as blue or green: " + family.hex());
+            int r = Integer.parseInt(family.hex().substring(1, 3), 16);
+            int g = Integer.parseInt(family.hex().substring(3, 5), 16);
+            int b = Integer.parseInt(family.hex().substring(5, 7), 16);
+            boolean green = g > r + 25 && g > b + 25;
+            // Purple has more red than green; a blue has green at least level with red.
+            boolean blue = b > r + 25 && b > g + 25 && g >= r;
+            assertFalse(blue, family + " reads as blue, which is left to links");
+            assertEquals(family == Family.SMELL || family == Family.ENVY, green, family + " green?");
         }
     }
 
     @Test
-    void givenAFindingFamily_whenAskedForItsMark_thenSeriousIsSolidAndMilderIsHollow() {
-        assertEquals("&#9724;", Family.CLASS_FINDING.mark(true));
-        assertEquals("&#9723;", Family.CLASS_FINDING.mark(false));
-        assertEquals("&#9670;", Family.METHOD_FINDING.mark(true));
-        assertEquals("&#9671;", Family.METHOD_FINDING.mark(false));
+    void givenALevel_whenAskedForItsMark_thenAClassIsASquareAndAMethodIsADiamond() {
+        assertEquals("&#9724;", ReportPalette.levelMark(false));
+        assertEquals("&#9670;", ReportPalette.levelMark(true));
     }
 
     @Test
-    void givenAFamilyWithOneMark_whenAskedForItsMark_thenSeriousnessMakesNoDifference() {
-        assertEquals("&#10227;", Family.CYCLE.mark(true));
-        assertEquals("&#10227;", Family.CYCLE.mark(false));
-        assertEquals("&#9873;", Family.FIX_FIRST.mark(true));
-        assertEquals("&#128293;", Family.HOTSPOT.mark(false));
-        assertEquals("", Family.NEUTRAL.mark(true));
-        assertEquals("", Family.INK.mark(true));
+    void givenAFamily_whenAskedForItsOwnMark_thenOnlyTheNonSmellFamiliesHaveOne() {
+        assertEquals("&#10227;", Family.CYCLE.mark());
+        assertEquals("&#9873;", Family.FIX_FIRST.mark());
+        assertEquals("&#128293;", Family.HOTSPOT.mark());
+        for (Family family : Family.values()) {
+            if (family.isSmell()) {
+                assertEquals("", family.mark(), family + " takes the level mark instead");
+            }
+        }
+        assertFalse(Family.SMELL.isSmell(), "the group colour is never a tag on one finding");
     }
 
     @Test
-    void givenAFamily_whenTextSitsOnItsColour_thenTheTextColourKeepsItReadable() {
-        assertEquals("#ffffff", Family.FIX_FIRST.textOn());
-        assertEquals("#ffffff", Family.CYCLE.textOn());
-        assertEquals("#ffffff", Family.CLASS_FINDING.textOn());
-        assertEquals("#ffffff", Family.METHOD_FINDING.textOn());
-        // Orange and the pale backgrounds are too light for white text.
-        assertEquals(Family.INK.hex(), Family.HOTSPOT.textOn());
-        assertEquals(Family.INK.hex(), Family.CYCLE_PALE.textOn());
-        assertEquals(Family.INK.hex(), Family.NEUTRAL.textOn());
+    void givenALightColour_whenTextIsWrittenOnIt_thenTheTextIsDark() {
+        for (Family light : List.of(Family.GOD, Family.SMELL, Family.HOTSPOT, Family.CYCLE_PALE, Family.NEUTRAL)) {
+            assertEquals(Family.INK.hex(), light.textOn(), light.toString());
+        }
+        for (Family dark : List.of(Family.BRAIN, Family.BRAIN_LIGHT, Family.ENVY, Family.COUPLING, Family.QUIET)) {
+            assertEquals("#ffffff", dark.textOn(), dark.toString());
+        }
     }
 
     @Test
-    void givenAFindingLevel_whenAskedForItsFamily_thenMethodsAndClassesDiffer() {
-        assertEquals(Family.METHOD_FINDING, ReportPalette.forFinding(true));
-        assertEquals(Family.CLASS_FINDING, ReportPalette.forFinding(false));
-    }
-
-    @Test
-    void givenAFindingType_whenAskedIfSerious_thenOnlyGodBrainClassAndBrainMethodAre() {
-        assertTrue(ReportPalette.isSerious("GOD"));
-        assertTrue(ReportPalette.isSerious("BRAIN_CLASS"));
-        assertTrue(ReportPalette.isSerious("BRAIN_METHOD"));
-        assertFalse(ReportPalette.isSerious("FEATURE_ENVY"));
-        assertFalse(ReportPalette.isSerious("DATA_CLASS"));
-        assertFalse(ReportPalette.isSerious(null));
-    }
-
-    @Test
-    void givenAFamily_whenAskedForItsName_thenItIsWhatTheKeyWillSay() {
-        assertEquals("Fix first", Family.FIX_FIRST.label());
-        assertEquals("Cycle", Family.CYCLE.label());
-        assertEquals("Class finding", Family.CLASS_FINDING.label());
-        assertEquals("Method finding", Family.METHOD_FINDING.label());
-        assertEquals("Hotspot", Family.HOTSPOT.label());
+    void givenEveryFamily_whenAskedForItsLabelAndMeaning_thenBothAreThere() {
+        for (Family family : Family.values()) {
+            assertFalse(family.label().isBlank(), family.toString());
+            assertFalse(family.meaning().isBlank(), family.toString());
+        }
     }
 }

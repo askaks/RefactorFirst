@@ -1,5 +1,6 @@
 package org.hjug.graphbuilder.metrics;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -137,6 +138,36 @@ public final class DisharmonyLimits {
             Map.entry("ExtensionReceiverTypes", "types it adds extension functions to"),
             Map.entry("PermittedSubtypes", "permitted subtypes"),
             Map.entry("HasExplicitLogic", "has logic of its own (1 = yes)"));
+
+    /** A named point on a metric's scale, in the word the detector's source uses for it. */
+    public record Level(String name, double value) {}
+
+    private static final Map<String, List<Level>> LEVELS = Map.of(
+            "WMC",
+                    List.of(
+                            new Level("average", DisharmonyDetector.WMC_AVERAGE),
+                            new Level("high", DisharmonyDetector.WMC_HIGH),
+                            new Level("very high", DisharmonyDetector.WMC_VERY_HIGH)),
+            "NOM",
+                    List.of(
+                            new Level("average", DisharmonyDetector.NOM_AVERAGE),
+                            new Level("high", DisharmonyDetector.NOM_HIGH)),
+            "ATFD", List.of(new Level("few", DisharmonyDetector.FEW)),
+            "NOAV", List.of(new Level("many", DisharmonyDetector.NOAV_MANY)),
+            "MAXNESTING", List.of(new Level("deep", DisharmonyDetector.MAXNESTING_DEEP)),
+            "TCC",
+                    List.of(
+                            new Level("a third", DisharmonyDetector.ONE_THIRD),
+                            new Level("half", DisharmonyDetector.HALF)));
+
+    /**
+     * The named levels on a metric's scale, lowest first.
+     *
+     * @return the levels, or an empty list when none are named for the metric
+     */
+    public static List<Level> levels(String metricName) {
+        return metricName == null ? List.of() : LEVELS.getOrDefault(metricName, List.of());
+    }
 
     /**
      * The limit a metric has to cross for a finding of the given type.

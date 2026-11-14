@@ -43,7 +43,7 @@ final class ReportKey {
                 swatch("background:" + Family.CYCLE_PALE.hex() + ";border:1px solid #999;width:1.5em;height:0.9em;");
         String plain = swatch("background:" + Family.NEUTRAL.hex()
                 + ";border:1px solid #999;border-radius:50%;width:1.5em;height:0.9em;");
-        String mark = "<span style=\"color:" + cycle + ";font-weight:bold;\">" + Family.CYCLE.mark(true) + "</span> ";
+        String mark = "<span style=\"color:" + cycle + ";font-weight:bold;\">" + Family.CYCLE.mark() + "</span> ";
         return "<div class=\"rf-key\" style=\"" + BOX + "\"><strong>Key</strong> "
                 + entry(outline + mark + "outlined: a class or package <strong>in a cycle</strong>")
                 + entry(line + "thick line: a <strong>relationship to cut</strong>; cutting these breaks the cycles")
@@ -52,15 +52,21 @@ final class ReportKey {
                 + "</div>\n";
     }
 
-    /** The key for the tags on findings: every family that can appear as a tag, with what it means. */
+    /** The key for the tags on findings: each kind of problem that has its own colour, and the two level marks. */
     static String forFindings() {
         StringBuilder sb = new StringBuilder();
         sb.append("<div class=\"rf-key\" style=\"").append(BOX).append("\"><strong>Key</strong> ");
-        for (Family family :
-                List.of(Family.FIX_FIRST, Family.CYCLE, Family.CLASS_FINDING, Family.METHOD_FINDING, Family.HOTSPOT)) {
-            sb.append(entry(tag(family, true, family.label()) + " " + family.meaning()));
-        }
-        sb.append(entry("A solid tag is a serious finding; an outlined tag is a milder one."));
+        sb.append(entry(tag(Family.CYCLE, false, Family.CYCLE.label()) + " " + Family.CYCLE.meaning()));
+        sb.append(entry(tag(Family.GOD, false, Family.GOD.label()) + " " + Family.GOD.meaning()));
+        sb.append(entry(tag(Family.BRAIN, false, Family.BRAIN.label()) + " " + Family.BRAIN.meaning()));
+        sb.append(
+                entry(tag(Family.BRAIN_LIGHT, true, Family.BRAIN_LIGHT.label()) + " " + Family.BRAIN_LIGHT.meaning()));
+        sb.append(entry(tag(Family.ENVY, true, Family.ENVY.label()) + " " + Family.ENVY.meaning()));
+        sb.append(entry(tag(Family.COUPLING, true, Family.COUPLING.label()) + " " + Family.COUPLING.meaning()));
+        sb.append(entry(tag(Family.QUIET, false, Family.QUIET.label()) + " " + Family.QUIET.meaning()));
+        sb.append(entry(tag(Family.HOTSPOT, false, Family.HOTSPOT.label()) + " " + Family.HOTSPOT.meaning()));
+        sb.append(entry(
+                ReportPalette.levelMark(false) + " a class &#160; " + ReportPalette.levelMark(true) + " a method"));
         sb.append("</div>\n");
         return sb.toString();
     }
@@ -176,7 +182,7 @@ final class ReportKey {
         String flagged =
                 swatch("background:" + Family.CYCLE_PALE.hex() + ";border:1px solid #999;width:1.5em;height:0.9em;");
         return "<div class=\"rf-key\" style=\"" + BOX + "\"><strong>Key</strong> "
-                + entry(tag(Family.FIX_FIRST, true, "fix first") + " priority 1: cut this first")
+                + entry(tag(Family.FIX_FIRST, false, "fix first") + " priority 1: cut this first")
                 + entry(flagged + cycleMark() + "how many cycles the relationship is part of")
                 + entry("<strong>hardest</strong>: the most uses to move, of everything in the table")
                 + "</div>\n";
@@ -198,7 +204,7 @@ final class ReportKey {
             return plainNumberCell(priority);
         }
         return "<td align=\"right\" style=\"white-space:nowrap;\">" + priority + " "
-                + tag(Family.FIX_FIRST, true, "fix first") + "</td>\n";
+                + tag(Family.FIX_FIRST, false, "fix first") + "</td>\n";
     }
 
     /** A strength cell: the strongest relationship in the table is the hardest to cut, and says so. */
@@ -246,8 +252,7 @@ final class ReportKey {
     }
 
     private static String cycleMark() {
-        return "<span style=\"color:" + Family.CYCLE.hex() + ";font-weight:bold;\">" + Family.CYCLE.mark(true)
-                + "</span> ";
+        return "<span style=\"color:" + Family.CYCLE.hex() + ";font-weight:bold;\">" + Family.CYCLE.mark() + "</span> ";
     }
 
     private static String plainNumberCell(String value) {
@@ -263,16 +268,17 @@ final class ReportKey {
     }
 
     /**
-     * A small rounded label. Solid: the family's colour behind the text. Outline: the family's colour as
-     * border and text on white, for the milder finding types. The family's mark leads the text either way.
+     * A small filled label in a family's colour. A smell's tag leads with the level mark, a square for a class
+     * or a diamond for a method; cycle, hotspot and fix first lead with their own mark. It never breaks across
+     * lines.
+     *
+     * @param methodLevel whether the finding is about one method; only read for the smell families
      */
-    static String tag(Family family, boolean solid, String text) {
-        String colours = solid
-                ? "color:" + family.textOn() + ";background:" + family.hex() + ";border:1.5px solid " + family.hex()
-                : "color:" + family.hex() + ";background:" + Family.NEUTRAL.hex() + ";border:1.5px solid "
-                        + family.hex();
-        String mark = family.mark(solid);
-        return "<span style=\"font-size:0.8em;font-weight:bold;" + colours + ";border-radius:9px;padding:1px 8px;\">"
+    static String tag(Family family, boolean methodLevel, String text) {
+        String mark = family.isSmell() ? ReportPalette.levelMark(methodLevel) : family.mark();
+        return "<span style=\"font-size:0.8em;font-weight:bold;white-space:nowrap;color:" + family.textOn()
+                + ";background:" + family.hex() + ";border:1.5px solid " + family.hex()
+                + ";border-radius:9px;padding:1px 8px;\">"
                 + (mark.isEmpty() ? "" : mark + " ")
                 + esc(text)
                 + "</span>";
