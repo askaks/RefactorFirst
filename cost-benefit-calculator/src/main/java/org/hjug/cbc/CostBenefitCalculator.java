@@ -35,6 +35,15 @@ import org.jgrapht.graph.DefaultWeightedEdge;
 @Slf4j
 public class CostBenefitCalculator implements AutoCloseable {
 
+    /**
+     * Highest raw priority first. On a tie, the file that changes more goes first, then by path so the order is
+     * the same on every run. Without the tie-break, "priority 1" between equal findings was whichever came first.
+     */
+    static final Comparator<RankedDisharmony> BY_PRIORITY = Comparator.comparing(RankedDisharmony::getRawPriority)
+            .thenComparing(RankedDisharmony::getCommitCount, Comparator.nullsFirst(Comparator.naturalOrder()))
+            .reversed()
+            .thenComparing(RankedDisharmony::getPath, Comparator.nullsLast(Comparator.naturalOrder()));
+
     private Report report;
     private final String repositoryPath;
     private GitLogReader gitLogReader;
@@ -95,7 +104,7 @@ public class CostBenefitCalculator implements AutoCloseable {
         List<RankedDisharmony> rankedDisharmonies = godClasses.stream()
                 .filter(godClass -> rankedLogInfosByPath.containsKey(godClass.getFileRepoPath()))
                 .map(godClass -> new RankedDisharmony(godClass, rankedLogInfosByPath.get(godClass.getFileRepoPath())))
-                .sorted(Comparator.comparing(RankedDisharmony::getRawPriority).reversed())
+                .sorted(BY_PRIORITY)
                 .collect(Collectors.toList());
 
         int godClassPriority = 1;
@@ -204,7 +213,7 @@ public class CostBenefitCalculator implements AutoCloseable {
         List<RankedDisharmony> rankedDisharmonies = instances.stream()
                 .filter(i -> rankedLogInfosByPath.containsKey(i.getFileRepoPath()))
                 .map(i -> new RankedDisharmony(i, rankedLogInfosByPath.get(i.getFileRepoPath())))
-                .sorted(Comparator.comparing(RankedDisharmony::getRawPriority).reversed())
+                .sorted(BY_PRIORITY)
                 .collect(Collectors.toList());
 
         int priority = 1;
@@ -310,8 +319,7 @@ public class CostBenefitCalculator implements AutoCloseable {
                     new RankedDisharmony(cboClass, rankedLogInfosByPath.get(cboClass.getFileRepoPath())));
         }
 
-        rankedDisharmonies.sort(
-                Comparator.comparing(RankedDisharmony::getRawPriority).reversed());
+        rankedDisharmonies.sort(BY_PRIORITY);
 
         int cboPriority = 1;
         for (RankedDisharmony rankedCBODisharmony : rankedDisharmonies) {
