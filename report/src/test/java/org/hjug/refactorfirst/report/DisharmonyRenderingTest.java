@@ -73,7 +73,9 @@ class DisharmonyRenderingTest {
         assertFalse(simple.contains("BrainMethods Rank"), "Simple mode should not show rank columns");
         assertFalse(simple.contains("<th>BrainMethods</th>"), "Simple mode should not show metric value columns");
         assertTrue(detailed.contains("BrainMethods Rank"), "Detailed mode must show metric rank columns");
-        assertTrue(detailed.contains("<th>BrainMethods</th>"), "Detailed mode must show metric value columns");
+        assertTrue(
+                detailed.contains("<th rowspan=\"2\">BrainMethods</th>"),
+                "Detailed mode must show metric value columns");
         assertTrue(detailed.contains("Raw Priority"), "Detailed mode must show Raw Priority");
         assertTrue(detailed.contains("Full Path"), "Detailed mode must show Full Path");
     }

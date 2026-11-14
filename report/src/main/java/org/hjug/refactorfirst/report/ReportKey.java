@@ -198,6 +198,21 @@ final class ReportKey {
                 + cycleMark().strip() + "</td>\n";
     }
 
+    /** A findings section heading: the class or method mark in the finding's colour, then the title. */
+    static String sectionTitle(String anchorId, boolean methodLevel, String title) {
+        return heading(anchorId, ReportPalette.forFinding(anchorId).hex(), ReportPalette.levelMark(methodLevel), title);
+    }
+
+    /** A cycle section heading: the cycle mark in the cycle colour, then the title. */
+    static String cycleSectionTitle(String anchorId, String title) {
+        return heading(anchorId, Family.CYCLE.hex(), Family.CYCLE.mark(), title);
+    }
+
+    private static String heading(String anchorId, String colour, String mark, String title) {
+        return "<div style=\"text-align: center;\"><a id=\"" + anchorId + "\"><h1><span style=\"color:" + colour
+                + ";\">" + mark + "</span> " + title + "</h1></a></div>\n";
+    }
+
     /** A priority cell: priority 1 carries the "fix first" tag. */
     static String priorityCell(String priority) {
         if (!"1".equals(priority)) {

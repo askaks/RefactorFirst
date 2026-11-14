@@ -225,4 +225,20 @@ class ReportKeyTest {
     private static VertexInfo v(String name) {
         return VertexInfo.forName(name);
     }
+
+    @Test
+    void sectionTitleLeadsWithTheLevelMarkInTheFindingsColour() {
+        String html = ReportKey.sectionTitle("BRAIN_METHOD", true, "Brain Methods");
+
+        assertTrue(html.contains("<a id=\"BRAIN_METHOD\"><h1><span style=\"color:" + Family.BRAIN_LIGHT.hex()), html);
+        assertTrue(html.contains(ReportPalette.levelMark(true) + "</span> Brain Methods</h1>"), html);
+    }
+
+    @Test
+    void cycleSectionTitleIsInTheCycleColour() {
+        String html = ReportKey.cycleSectionTitle("CYCLES", "Class Cycles");
+
+        assertTrue(html.contains("<a id=\"CYCLES\"><h1><span style=\"color:" + Family.CYCLE.hex()), html);
+        assertTrue(html.contains("</span> Class Cycles</h1>"), html);
+    }
 }

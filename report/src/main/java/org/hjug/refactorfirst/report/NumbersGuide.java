@@ -72,12 +72,18 @@ final class NumbersGuide {
                             + "real relationship that needs an interface between the two sides."),
             new Entry(
                     PRIORITY,
-                    "Priority and \"fix first\"",
-                    "Where a finding ranks among the others of its kind. It combines how far the numbers are over "
-                            + "their limits with how often the file changes in the project's history.",
-                    "Priority 1 of each kind carries the red \"fix first\" tag.",
+                    "Priority, Change Proneness Rank and Effort Rank",
+                    "<strong>Commit Count</strong> is how many commits touched the file. "
+                            + "<strong>Change Proneness Rank</strong> is the file's place when all files are sorted by "
+                            + "how often they change: higher means it changes more. "
+                            + "<strong>Effort Rank</strong> is its place when the findings are sorted by how hard "
+                            + "they are to fix: higher means harder. "
+                            + "<strong>Priority</strong> is the change rank minus the effort rank, biggest first: "
+                            + "1 is first.",
+                    "Priority 1 of each kind carries the red \"fix first\" tag. On a tie, the file with more "
+                            + "commits goes first.",
                     "A smell in a file nobody touches costs little. The same smell in a file that changes every "
-                            + "week is paid for every week.",
+                            + "week is paid for every week, so what changes often and is cheap to fix comes first.",
                     2,
                     "The place where cleaning up pays back soonest. A finding with a low priority can usually wait."),
             new Entry(
@@ -241,6 +247,47 @@ final class NumbersGuide {
                 : "";
     }
 
+    /** Text made safe to place in the page. Kept here so this class needs nothing from the report classes. */
+    static String escape(String text) {
+        return text == null
+                ? ""
+                : text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    }
+
+    /** A measure's plain name, as a link to its entry when it has one. */
+    static String nameLink(String key) {
+        String name = escape(DisharmonyLimits.plainName(key));
+        return has(key) ? "<a href=\"#" + anchor(key) + "\">" + name + "</a>" : name;
+    }
+
+    /** Every limit in one table: the number, the finding it belongs to, what is normal, which way is better. */
+    static String allLimits() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("<h3 style=\"margin:10px 0 2px;\">All the limits</h3>\n");
+        sb.append("<p style=\"margin:0 0 6px;font-size:0.9em;\">These are the tool's limits, taken from the book ")
+                .append("<sup>[1]</sup>. They are not an industry standard: another tool may draw the lines ")
+                .append("elsewhere.</p>\n");
+        sb.append(
+                        "<table class=\"rf-limits\" style=\"border-collapse:collapse;font-size:0.9em;margin:0 0 12px;\">\n<thead><tr>")
+                .append("<th>Number</th><th>Finding</th><th>Normal</th><th>Better</th></tr></thead>\n<tbody>\n");
+        for (DisharmonyLimits.Entry e : DisharmonyLimits.all()) {
+            boolean judged = DisharmonyLimits.crossingIsBad(e.disharmonyType(), e.metricName());
+            sb.append("<tr><td>")
+                    .append(nameLink(e.metricName()))
+                    .append("</td><td>")
+                    .append(e.disharmonyType())
+                    .append("</td><td>")
+                    .append(
+                            judged
+                                    ? e.limit().normalText()
+                                    : "counts when " + e.limit().describe())
+                    .append("</td><td>")
+                    .append(!judged ? "&#8212;" : DisharmonyLimits.higherIsBetter(e.metricName()) ? "higher" : "lower")
+                    .append("</td></tr>\n");
+        }
+        return sb.append("</tbody></table>\n").toString();
+    }
+
     /** The whole section, ready to place in the page. */
     static String render() {
         StringBuilder sb = new StringBuilder();
@@ -250,13 +297,15 @@ final class NumbersGuide {
                 .append("border-radius:12px;text-align:left;\">\n");
         sb.append("<style>.rf-why{padding:10px;border-bottom:1px solid #e4dfd3;border-radius:6px;}")
                 .append(".rf-why:target{background:#fff7d6;}")
+                .append(".rf-limits td,.rf-limits th{padding:1px 18px 1px 0;text-align:left;border:0;}")
                 .append(".rf-why-row{display:flex;gap:12px;margin-top:3px;font-size:0.9em;line-height:1.45;}")
                 .append(".rf-why-row>span:first-child{flex:0 0 130px;color:#666;}")
                 .append(".rf-why-row>span:last-child{flex:1;min-width:0;white-space:normal;}</style>\n");
         sb.append("<h2 style=\"margin:0 0 4px;\">What the numbers mean</h2>\n");
         sb.append("<p style=\"margin:0 0 8px;font-size:0.9em;\">For each number this report shows: what it measures, ")
-                .append("the value that gets it flagged, why that value, and what a flag may signal. A finding is ")
-                .append("only reported when all of its limits are crossed together.</p>\n");
+                .append("the value that gets it flagged, why that value, and what a flag may signal. How a ")
+                .append("finding's limits combine is said in one line above its table.</p>\n");
+        sb.append(allLimits());
         for (Entry entry : ENTRIES) {
             sb.append("<div class=\"rf-why\" id=\"")
                     .append(anchor(entry.key()))

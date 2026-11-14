@@ -667,8 +667,7 @@ public class SimpleHtmlReport {
             CodebaseGraphDTO codebaseGraphDTO) {
         StringBuilder stringBuilder = new StringBuilder();
 
-        stringBuilder.append(
-                "<div style=\"text-align: center;\"><a id=\"CLASSEDGES\"><h1>Class Relationship Removal Priority</h1></a></div>\n");
+        stringBuilder.append(ReportKey.cycleSectionTitle("CLASSEDGES", "Class Relationship Removal Priority"));
         stringBuilder.append("<h2 align=\"center\">Refactor Starting with Priority 1</h2>\n");
         stringBuilder.append("<div style=\"text-align: center;\">\n");
         stringBuilder
@@ -717,8 +716,7 @@ public class SimpleHtmlReport {
             List<RankedDisharmony> edgeDisharmonies, String repoUrl, CodebaseGraphDTO codebaseGraphDTO) {
         StringBuilder stringBuilder = new StringBuilder();
 
-        stringBuilder.append(
-                "<div style=\"text-align: center;\"><a id=\"PACKAGEEDGES\"><h1>Package Relationship Removal Priority</h1></a></div>\n");
+        stringBuilder.append(ReportKey.cycleSectionTitle("PACKAGEEDGES", "Package Relationship Removal Priority"));
         stringBuilder.append("<h2 align=\"center\">Refactor Starting with Priority 1</h2>\n");
         stringBuilder.append("<div style=\"text-align: center;\">\n");
         stringBuilder
@@ -898,7 +896,7 @@ public class SimpleHtmlReport {
     private String renderClassCycleSummary(List<RankedCycle> rankedCycles) {
         StringBuilder stringBuilder = new StringBuilder();
 
-        stringBuilder.append("<div style=\"text-align: center;\"><a id=\"CYCLES\"><h1>Class Cycles</h1></a></div>\n");
+        stringBuilder.append(ReportKey.cycleSectionTitle("CYCLES", "Class Cycles"));
 
         stringBuilder.append("<h2 align=\"center\">Class Cycles by the numbers:</h2>\n");
         stringBuilder.append("<div align=\"center\">");
@@ -1196,33 +1194,6 @@ public class SimpleHtmlReport {
     }
 
     /**
-     * Says what made something a finding: each of its numbers, named in plain words, with the limit it had
-     * to cross where the rule has one. Nothing new is measured; these are the numbers the rule already used.
-     */
-    static String whyFinding(RankedDisharmony rd) {
-        List<DisharmonyMetric> metrics = rd.getRankedMetrics();
-        if (metrics == null || metrics.isEmpty()) {
-            return "";
-        }
-        List<String> lines = new ArrayList<>();
-        for (DisharmonyMetric m : metrics) {
-            double v = m.getValue();
-            // Whole numbers as they are; ratios to two places, which is all a reader can use.
-            String value = v == Math.floor(v) ? String.valueOf((long) v) : String.format(Locale.US, "%.2f", v);
-            String line = "<strong>" + value + "</strong> " + escapeHtmlLabel(DisharmonyLimits.plainName(m.getName()));
-            lines.add(line
-                    + DisharmonyLimits.of(rd.getDisharmonyType(), m.getName())
-                            .map(l -> " <span style=\"color:#666;\">(flagged " + l.describe()
-                                    + (NumbersGuide.has(m.getName())
-                                            ? ", " + NumbersGuide.whyLink(m.getName(), "why?")
-                                            : "")
-                                    + ")</span>")
-                            .orElse(""));
-        }
-        return String.join("<br/>", lines);
-    }
-
-    /**
      * Renders a table section for any disharmony type.
      * Column headers are derived from the ranked metrics carried on each RankedDisharmony.
      */
@@ -1240,11 +1211,7 @@ public class SimpleHtmlReport {
         int maxPriority = ranked.get(ranked.size() - 1).getPriority();
 
         StringBuilder sb = new StringBuilder();
-        sb.append("<div style=\"text-align: center;\"><a id=\"")
-                .append(anchorId)
-                .append("\"><h1>")
-                .append(title)
-                .append("</h1></a></div>\n");
+        sb.append(ReportKey.sectionTitle(anchorId, methodLevel, title));
 
         sb.append("<div align=\"center\">");
         sb.append("<table border=\"5px\">\n");
@@ -1264,6 +1231,7 @@ public class SimpleHtmlReport {
         sb.append("<h2 align=\"center\">")
                 .append(title)
                 .append(" by the numbers: (Refactor Starting with Priority 1)</h2>\n");
+        sb.append(FindingsTable.ruleLine(ranked.get(0).getDisharmonyType()));
         sb.append("<div align=\"center\">");
         sb.append(rowToggle(anchorId));
         sb.append("<table align=\"center\" border=\"5px\">\n");
@@ -1273,33 +1241,41 @@ public class SimpleHtmlReport {
 
         boolean showPartners = ranked.get(0).getDuplicationPartners() != null;
 
+        boolean grouped = sampleMetrics != null && !sampleMetrics.isEmpty();
+        String span = grouped ? "<th rowspan=\"2\">" : "<th>";
         sb.append("<thead><tr>");
-        sb.append("<th>Class</th>\n");
+        sb.append(span).append("Class</th>\n");
         if (methodLevel) {
-            sb.append("<th>Method</th>\n");
+            sb.append(span).append("Method</th>\n");
         }
-        sb.append("<th>Why it is here</th>\n");
-        sb.append("<th>Priority</th>\n");
+        if (grouped) {
+            sb.append(FindingsTable.groupHeading(anchorId, ranked.get(0).getDisharmonyType(), sampleMetrics.size()));
+        }
+        sb.append(span).append("Priority</th>\n");
         if (showDetails) {
-            sb.append("<th>Raw Priority</th>\n");
-            sb.append("<th>Description</th>\n");
+            sb.append(span).append("Raw Priority</th>\n");
+            sb.append(span).append("Description</th>\n");
         }
-        sb.append("<th>Change Proneness Rank</th>\n");
-        sb.append("<th>Effort Rank</th>\n");
+        sb.append(span).append("Change Proneness Rank</th>\n");
+        sb.append(span).append("Effort Rank</th>\n");
         if (showDetails) {
             for (DisharmonyMetric m : sampleMetrics) {
-                sb.append("<th>").append(m.getName()).append("</th>\n");
-                sb.append("<th>").append(m.getName()).append(" Rank</th>\n");
+                sb.append(span).append(m.getName()).append("</th>\n");
+                sb.append(span).append(m.getName()).append(" Rank</th>\n");
             }
         }
         if (showPartners) {
-            sb.append("<th>Duplicate Partners</th>\n");
+            sb.append(span).append("Duplicate Partners</th>\n");
         }
-        sb.append("<th>Most Recent Commit Date</th>\n");
-        sb.append("<th>Commit Count</th>\n");
+        sb.append(span).append("Most Recent Commit Date</th>\n");
+        sb.append(span).append("Commit Count</th>\n");
         if (showDetails) {
-            sb.append("<th>Date of First Commit</th>\n");
-            sb.append("<th>Full Path</th>\n");
+            sb.append(span).append("Date of First Commit</th>\n");
+            sb.append(span).append("Full Path</th>\n");
+        }
+        if (grouped) {
+            sb.append("</tr>\n<tr>");
+            sb.append(FindingsTable.metricHeadings(anchorId, sampleMetrics));
         }
         sb.append("</tr>\n</thead>\n");
 
@@ -1318,9 +1294,7 @@ public class SimpleHtmlReport {
                 }
                 sb.append(drawTableCell(sig != null ? sig.replace("<", "&lt;").replace(">", "&gt;") : ""));
             }
-            sb.append("<td align=\"left\" style=\"white-space:nowrap;text-align:left;\">")
-                    .append(whyFinding(rd))
-                    .append("</td>\n");
+            sb.append(FindingsTable.metricCells(rd));
             sb.append(ReportKey.priorityCell(rd.getPriority().toString()));
             if (showDetails) {
                 sb.append(drawTableCell(rd.getRawPriority().toString()));
@@ -1362,6 +1336,8 @@ public class SimpleHtmlReport {
         sb.append("</tbody>\n");
         sb.append("</table>\n");
         sb.append(rowToggleLabel(anchorId, ranked.size()));
+        sb.append(FindingsTable.normalLine(anchorId, ranked.get(0)));
+        sb.append(FindingsTable.priorityLine());
         sb.append("</div>");
         return sb.toString();
     }

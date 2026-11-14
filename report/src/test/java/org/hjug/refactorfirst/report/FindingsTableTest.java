@@ -21,42 +21,113 @@ class FindingsTableTest {
     private final SimpleHtmlReport report = new SimpleHtmlReport();
 
     @Test
-    void givenAGodClass_whenAskedWhyItIsListed_thenEachNumberIsNamedInWordsWithItsLimit() {
-        String why = SimpleHtmlReport.whyFinding(godClass(1));
+    void givenAGodClass_whenItsNumbersAreShown_thenEachIsACellWithHowFarPastTheLimit() {
+        String cells = FindingsTable.metricCells(godClass(1));
 
-        assertTrue(why.contains("<strong>9</strong> uses of other classes' data"), why);
-        assertTrue(why.contains("(flagged over 5, <a href=\"#WHY_ATFD\""), why);
-        assertTrue(why.contains("<strong>61</strong> complexity of all its methods"), why);
-        assertTrue(why.contains("(flagged 47 or more, <a href=\"#WHY_WMC\""), why);
-        assertTrue(why.contains("<strong>0.20</strong> cohesion (0 to 1)"), why);
-        assertTrue(why.contains("(flagged under 0.33, <a href=\"#WHY_TCC\""), why);
-        assertEquals(3, why.split("why\\?</a>", -1).length - 1, "one why link per limit");
+        assertEquals(3, cells.split("<td", -1).length - 1, cells);
+        assertTrue(cells.contains("<strong>9</strong>"), cells);
+        assertTrue(cells.contains("1.8&times; the limit"), cells);
+        assertTrue(cells.contains("<strong>61</strong>"), cells);
+        assertTrue(cells.contains("just over"), cells);
+        assertTrue(cells.contains("<strong>0.2</strong>"), cells);
+        assertTrue(cells.contains("0.13 short"), cells);
+        assertFalse(cells.contains("flagged"), cells);
+        assertFalse(cells.contains("why?"), cells);
     }
 
     @Test
-    void givenAFindingTypeWithNoSingleLimit_whenAskedWhy_thenTheNumbersAreNamedAndNoLimitIsInvented() {
+    void givenAFindingTypeWithNoLimits_whenItsNumbersAreShown_thenNoLimitIsInvented() {
         RankedDisharmony refused =
                 ranked(DisharmonyTypes.REFUSED_PARENT_BEQUEST, 1, new DisharmonyMetric("NOM", 12, Direction.ASCENDING));
 
-        String why = SimpleHtmlReport.whyFinding(refused);
+        String cells = FindingsTable.metricCells(refused);
 
-        assertEquals("<strong>12</strong> methods", why);
-        assertFalse(why.contains("flagged"));
+        assertTrue(cells.contains("<strong>12</strong>"), cells);
+        assertFalse(cells.contains("limit"), cells);
+        assertEquals("", FindingsTable.normalLine("RPB", refused));
+        assertEquals("", FindingsTable.ruleLine(DisharmonyTypes.REFUSED_PARENT_BEQUEST));
     }
 
     @Test
-    void givenAFindingWithNoNumbers_whenAskedWhy_thenThereIsNothingToSay() {
-        assertEquals("", SimpleHtmlReport.whyFinding(ranked(DisharmonyTypes.GOD_CLASS, 1)));
+    void givenALimitThatIsNotBadInItself_whenShown_thenItGetsNoRedTextAndReadsCountsWhen() {
+        RankedDisharmony envy = ranked(
+                DisharmonyTypes.FEATURE_ENVY,
+                1,
+                new DisharmonyMetric("ATFD", 10, Direction.ASCENDING),
+                new DisharmonyMetric("LAA", 0.17, Direction.DESCENDING),
+                new DisharmonyMetric("FDP", 1, Direction.ASCENDING));
+
+        String cells = FindingsTable.metricCells(envy);
+        String line = FindingsTable.normalLine("FEATURE_ENVY", envy);
+
+        assertEquals(2, cells.split("color:" + Family.FIX_FIRST.hex(), -1).length - 1, cells);
+        assertTrue(line.contains("counts when 5 or fewer"), line);
+        assertTrue(line.contains("0.33 or more, higher is better"), line);
     }
 
     @Test
-    void givenTheDefaultTable_whenRendered_thenItHasTheReasonColumnAndFixFirstOnPriorityOne() {
+    void givenABrainMethod_whenTheNormalLineIsWritten_thenEachLimitIsThereOnceWithItsNameAsTheLink() {
+        RankedDisharmony brain = ranked(
+                DisharmonyTypes.BRAIN_METHOD,
+                1,
+                new DisharmonyMetric("LOC", 205, Direction.ASCENDING),
+                new DisharmonyMetric("CYCLO", 26, Direction.ASCENDING),
+                new DisharmonyMetric("MAXNESTING", 6, Direction.ASCENDING),
+                new DisharmonyMetric("NOAV", 19, Direction.ASCENDING));
+
+        String line = FindingsTable.normalLine("BRAIN_METHOD", brain);
+
+        assertTrue(line.contains("<a href=\"#WHY_LOC\">lines of code</a> up to 65"), line);
+        assertTrue(line.contains("under 4"), line);
+        assertTrue(line.contains("lower is better for all four"), line);
+        assertTrue(line.contains("the tool's limits, taken from the book"), line);
+        assertFalse(line.contains("why?"), line);
+    }
+
+    @Test
+    void givenAGodClass_whenTheNormalLineIsWritten_thenTheNumberThatRunsTheOtherWaySaysSo() {
+        String line = FindingsTable.normalLine("GOD", godClass(1));
+
+        assertTrue(line.contains("0.33 or more, higher is better"), line);
+        assertFalse(line.contains("for all three"), line);
+    }
+
+    @Test
+    void givenEverySmellWithLimits_whenAskedForItsRule_thenThereIsOneSentence() {
+        for (String type : List.of(
+                DisharmonyTypes.GOD_CLASS,
+                DisharmonyTypes.DATA_CLASS,
+                DisharmonyTypes.BRAIN_CLASS,
+                DisharmonyTypes.BRAIN_METHOD,
+                DisharmonyTypes.FEATURE_ENVY,
+                DisharmonyTypes.INTENSIVE_COUPLING,
+                DisharmonyTypes.DISPERSED_COUPLING,
+                DisharmonyTypes.SHOTGUN_SURGERY)) {
+            assertTrue(FindingsTable.ruleLine(type).contains(type), type);
+        }
+        assertTrue(FindingsTable.ruleLine(DisharmonyTypes.GOD_CLASS).contains("<strong>all three</strong>"));
+        assertTrue(FindingsTable.ruleLine(DisharmonyTypes.DATA_CLASS).contains("under 31"));
+        assertTrue(FindingsTable.ruleLine(DisharmonyTypes.BRAIN_CLASS).contains("390 lines"));
+    }
+
+    @Test
+    void givenTheDefaultTable_whenRendered_thenTheNumbersAreColumnsUnderOneColouredHeading() {
         String html = report.renderDisharmonyInfo("", spec("GOD"), false, List.of(godClass(1), godClass(2)));
 
-        assertTrue(html.contains("<th>Why it is here</th>"), html);
-        assertTrue(html.contains("uses of other classes' data"));
+        assertFalse(html.contains("Why it is here"), html);
+        assertTrue(html.contains("colspan=\"3\""), html);
+        assertTrue(html.contains("What makes it a God Class"), html);
+        assertTrue(html.contains("border-top:7px solid " + Family.GOD.hex()), html);
+        assertTrue(html.contains(">Uses of other classes' data</th>"), html);
+        for (String name : List.of(
+                "Priority", "Change Proneness Rank", "Effort Rank", "Most Recent Commit Date", "Commit Count")) {
+            assertTrue(html.contains("<th rowspan=\"2\">" + name + "</th>"), name);
+        }
         assertEquals(1, html.split("fix first</span>", -1).length - 1, "only priority 1 is fix first");
-        assertTrue(html.contains("background:" + Family.FIX_FIRST.hex()));
+        assertTrue(html.contains("What counts as normal"), html);
+        assertTrue(html.contains("href=\"#WHY_PRIORITY\""), html);
+        assertTrue(html.contains("<h1><span style=\"color:" + Family.GOD.hex()), html);
+        assertFalse(html.contains("flagged"), html);
     }
 
     @Test
@@ -68,11 +139,11 @@ class FindingsTableTest {
     }
 
     @Test
-    void givenALongRatio_whenAskedWhy_thenItIsShownToTwoPlaces() {
+    void givenALongRatio_whenShown_thenItIsShownToTwoPlaces() {
         RankedDisharmony brain =
                 ranked(DisharmonyTypes.BRAIN_CLASS, 1, new DisharmonyMetric("TCC", 1.0 / 3, Direction.DESCENDING));
 
-        assertTrue(SimpleHtmlReport.whyFinding(brain).startsWith("<strong>0.33</strong> cohesion"));
+        assertTrue(FindingsTable.metricCells(brain).contains("<strong>0.33</strong>"));
     }
 
     private static RankedDisharmony godClass(int priority) {

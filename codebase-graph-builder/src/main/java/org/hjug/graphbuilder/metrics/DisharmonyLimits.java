@@ -1,8 +1,11 @@
 package org.hjug.graphbuilder.metrics;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeMap;
 
 /**
  * The limits behind each finding, in a form a report can show beside a value.
@@ -46,6 +49,17 @@ public final class DisharmonyLimits {
                 case AT_LEAST -> number + " or more";
                 case UNDER -> "under " + number;
                 case AT_MOST -> number + " or fewer";
+            };
+        }
+
+        /** The other side of the limit, in words: what is not flagged. "up to 65", "under 4", "0.33 or more". */
+        public String normalText() {
+            String number = value == Math.floor(value) ? String.valueOf((long) value) : String.valueOf(value);
+            return switch (bound) {
+                case OVER -> "up to " + number;
+                case AT_LEAST -> "under " + number;
+                case UNDER -> number + " or more";
+                case AT_MOST -> "over " + number;
             };
         }
     }
@@ -179,6 +193,97 @@ public final class DisharmonyLimits {
     public static Optional<Limit> of(String disharmonyType, String metricName) {
         Map<String, Limit> forType = disharmonyType == null ? null : LIMITS.get(disharmonyType);
         return forType == null || metricName == null ? Optional.empty() : Optional.ofNullable(forType.get(metricName));
+    }
+
+    /** Numbers where a higher value is the good side. Every other number with a good side is better lower. */
+    private static final Set<String> HIGHER_IS_BETTER = Set.of("TCC", "LAA", "WOC");
+
+    /**
+     * Limits that describe a finding without being bad in themselves: a Data Class has low complexity, Feature
+     * Envy takes from few classes, coupling is spread out or not. Crossing these is not "over the limit".
+     */
+    private static final Set<String> NOT_BAD_IN_ITSELF = Set.of(
+            DisharmonyTypes.DATA_CLASS + "/WMC",
+            DisharmonyTypes.FEATURE_ENVY + "/FDP",
+            DisharmonyTypes.INTENSIVE_COUPLING + "/CDISP",
+            DisharmonyTypes.DISPERSED_COUPLING + "/CDISP",
+            DisharmonyTypes.BRAIN_CLASS + "/BrainMethods");
+
+    /** The finding types that have limits, in the order the report shows them. */
+    private static final List<String> TYPE_ORDER = List.of(
+            DisharmonyTypes.GOD_CLASS,
+            DisharmonyTypes.DATA_CLASS,
+            DisharmonyTypes.BRAIN_CLASS,
+            DisharmonyTypes.BRAIN_METHOD,
+            DisharmonyTypes.FEATURE_ENVY,
+            DisharmonyTypes.INTENSIVE_COUPLING,
+            DisharmonyTypes.DISPERSED_COUPLING,
+            DisharmonyTypes.SHOTGUN_SURGERY);
+
+    private static final Map<String, String> RULES = Map.of(
+            DisharmonyTypes.GOD_CLASS,
+            "A class is a God Class when all three numbers are past their limit.",
+            DisharmonyTypes.DATA_CLASS,
+            "A class is a Data Class when few of its methods do real work and it exposes many fields while staying "
+                    + "simple: more than " + DisharmonyDetector.FEW + " public fields and accessors with complexity "
+                    + "under " + DisharmonyDetector.WMC_HIGH + ", or more than " + DisharmonyDetector.MANY
+                    + " with complexity under " + DisharmonyDetector.WMC_VERY_HIGH + ".",
+            DisharmonyTypes.BRAIN_CLASS,
+            "A class is a Brain Class when its complexity is " + DisharmonyDetector.WMC_VERY_HIGH
+                    + " or more and its cohesion is under " + DisharmonyDetector.HALF
+                    + ", and it has either several Brain Methods and " + DisharmonyDetector.LOC_CLASS_VERY_HIGH
+                    + " lines or more, or one Brain Method with " + (DisharmonyDetector.LOC_CLASS_VERY_HIGH * 2)
+                    + " lines and complexity " + (DisharmonyDetector.WMC_VERY_HIGH * 2)
+                    + " or more. A God Class is never also listed as a Brain Class.",
+            DisharmonyTypes.BRAIN_METHOD,
+            "A method is a Brain Method when all four numbers are past their limit.",
+            DisharmonyTypes.FEATURE_ENVY,
+            "A method has Feature Envy when all three hold: it uses a lot of other classes' data, little of its "
+                    + "own, and takes it from few classes.",
+            DisharmonyTypes.INTENSIVE_COUPLING,
+            "A method has Intensive Coupling when it is nested code that makes many calls into few classes: more "
+                    + "than " + DisharmonyDetector.SHORT_MEMORY_CAP + " calls with a spread under "
+                    + DisharmonyDetector.HALF + ", or more than " + DisharmonyDetector.FEW
+                    + " calls with a spread under " + DisharmonyDetector.ONE_QUARTER + ".",
+            DisharmonyTypes.DISPERSED_COUPLING,
+            "A method has Dispersed Coupling when all three hold: many calls to other classes, spread across many "
+                    + "of them, from nested code.",
+            DisharmonyTypes.SHOTGUN_SURGERY,
+            "A method causes Shotgun Surgery when both hold: many methods call it, and they sit in many classes.");
+
+    /**
+     * How a finding type's numbers combine, as one plain sentence written from the detector's rule.
+     *
+     * @return the sentence, or empty for a type with no limits here
+     */
+    public static Optional<String> rule(String disharmonyType) {
+        return disharmonyType == null ? Optional.empty() : Optional.ofNullable(RULES.get(disharmonyType));
+    }
+
+    /** One limit with the finding type and metric it belongs to. */
+    public record Entry(String disharmonyType, String metricName, Limit limit) {}
+
+    /** Every limit, by finding type in report order and then by metric name. */
+    public static List<Entry> all() {
+        List<Entry> entries = new ArrayList<>();
+        for (String type : TYPE_ORDER) {
+            new TreeMap<>(LIMITS.get(type)).forEach((metric, limit) -> entries.add(new Entry(type, metric, limit)));
+        }
+        return entries;
+    }
+
+    /** Whether a higher value of this metric is the good side. */
+    public static boolean higherIsBetter(String metricName) {
+        return metricName != null && HIGHER_IS_BETTER.contains(metricName);
+    }
+
+    /**
+     * Whether a value past this limit is bad in itself, so that "over the limit" is the right thing to say.
+     * False for limits that only describe the finding, and when there is no limit.
+     */
+    public static boolean crossingIsBad(String disharmonyType, String metricName) {
+        return of(disharmonyType, metricName).isPresent()
+                && !NOT_BAD_IN_ITSELF.contains(disharmonyType + "/" + metricName);
     }
 
     /** A metric's name in plain words, or the name itself when there is no plain form for it. */

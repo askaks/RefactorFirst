@@ -97,4 +97,50 @@ class DisharmonyLimitsTest {
         assertTrue(DisharmonyLimits.levels("CDISP").isEmpty());
         assertTrue(DisharmonyLimits.levels(null).isEmpty());
     }
+
+    @Test
+    void normalTextIsTheOtherSideOfTheLimit() {
+        assertEquals(
+                "up to 65",
+                DisharmonyLimits.of(DisharmonyTypes.BRAIN_METHOD, "LOC")
+                        .orElseThrow()
+                        .normalText());
+        assertEquals(
+                "under 4",
+                DisharmonyLimits.of(DisharmonyTypes.BRAIN_METHOD, "CYCLO")
+                        .orElseThrow()
+                        .normalText());
+        assertEquals(
+                "0.33 or more",
+                DisharmonyLimits.of(DisharmonyTypes.GOD_CLASS, "TCC")
+                        .orElseThrow()
+                        .normalText());
+        assertEquals(
+                "over 5",
+                DisharmonyLimits.of(DisharmonyTypes.FEATURE_ENVY, "FDP")
+                        .orElseThrow()
+                        .normalText());
+    }
+
+    @Test
+    void crossingIsBadOnlyWhereTheNumberHasAGoodDirection() {
+        assertTrue(DisharmonyLimits.crossingIsBad(DisharmonyTypes.GOD_CLASS, "WMC"));
+        assertTrue(DisharmonyLimits.crossingIsBad(DisharmonyTypes.GOD_CLASS, "TCC"));
+        assertFalse(DisharmonyLimits.crossingIsBad(DisharmonyTypes.DATA_CLASS, "WMC"));
+        assertFalse(DisharmonyLimits.crossingIsBad(DisharmonyTypes.FEATURE_ENVY, "FDP"));
+        assertFalse(DisharmonyLimits.crossingIsBad(DisharmonyTypes.DISPERSED_COUPLING, "CDISP"));
+        assertFalse(DisharmonyLimits.crossingIsBad(DisharmonyTypes.REFUSED_PARENT_BEQUEST, "NOM"));
+    }
+
+    @Test
+    void higherIsBetterForCohesionNotComplexity() {
+        assertTrue(DisharmonyLimits.higherIsBetter("TCC"));
+        assertFalse(DisharmonyLimits.higherIsBetter("WMC"));
+    }
+
+    @Test
+    void allListsEveryLimitStartingWithGodClass() {
+        assertEquals(DisharmonyTypes.GOD_CLASS, DisharmonyLimits.all().get(0).disharmonyType());
+        assertEquals(25, DisharmonyLimits.all().size());
+    }
 }

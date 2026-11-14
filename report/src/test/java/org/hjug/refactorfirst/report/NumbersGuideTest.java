@@ -100,4 +100,32 @@ class NumbersGuideTest {
     private static int count(String text, String part) {
         return text.split(Pattern.quote(part), -1).length - 1;
     }
+
+    @Test
+    void guideOpensWithOneTableOfEveryLimit() {
+        String html = NumbersGuide.render();
+
+        assertTrue(html.contains("All the limits"), html);
+        assertTrue(html.contains("taken from the book"));
+        assertTrue(html.contains("not an industry standard"));
+        assertTrue(html.contains("<th>Number</th><th>Finding</th><th>Normal</th><th>Better</th>"));
+        assertTrue(html.contains("<td>Brain Method</td><td>up to 65</td><td>lower</td>"), html);
+        assertTrue(html.contains("<td>Feature Envy</td><td>counts when 5 or fewer</td><td>&#8212;</td>"), html);
+    }
+
+    @Test
+    void priorityEntrySaysWhichWayEachNumberRuns() {
+        String html = NumbersGuide.render();
+
+        assertTrue(html.contains("higher means it changes more"));
+        assertTrue(html.contains("higher means harder"));
+        assertTrue(html.contains("1 is first"));
+        assertTrue(html.contains("On a tie, the file with more commits goes first"));
+    }
+
+    @Test
+    void nameLinkIsPlainTextWhenThereIsNoEntry() {
+        assertEquals("methods", NumbersGuide.nameLink("NOM"));
+        assertTrue(NumbersGuide.nameLink("WMC").startsWith("<a href=\"#WHY_WMC\">"));
+    }
 }
