@@ -92,18 +92,29 @@ public class SyntaxGapTests
         Facts facts = await Extracted.Value;
 
         Assert.Equal(
-            new[] { "Syntax.Tool@A_Helpers", "Syntax.Tool@B_Helpers", "Syntax.Tool@Dotted_Part", "Syntax.Tool@Dotted_Part~2" },
+            new[] { "Syntax.Tool@A_Helpers", "Syntax.Tool@B_Helpers", "Syntax.Tool@Dotted_Part", "Syntax.Tool@Dotted_Part~2", "Syntax.Tool@Dotted_Part~3" },
             facts.Types.Where(t => t.Name == "Tool").Select(t => t.Fqn));
         Assert.Equal(new[] { "Syntax.Tool@A_Helpers.RunA()" }, (await Method("UsesA", "Go")).CalledForeignMethods);
         Assert.Equal(new[] { "Syntax.Tool@B_Helpers.RunB()" }, (await Method("UsesB", "Go")).CalledForeignMethods);
     }
 
     /// `Dotted.Part.cs` and `Dotted_Part.cs` read the same once the dot is replaced; the second one in path order is numbered.
+    /// The number skips any name a real file already has: `Dotted_Part~2.cs` keeps "Dotted_Part~2", so the numbered one is "~3".
     [Fact]
     public async Task Given_FileLocalTypesInFilesThatDifferOnlyByDotAndUnderscore_When_Extracted_Then_BothAreKept()
     {
-        Assert.Equal(new[] { "Syntax.Tool@Dotted_Part~2.RunUnderscore()" }, (await Method("UsesUnderscore", "Go")).CalledForeignMethods);
+        Assert.Equal(new[] { "Syntax.Tool@Dotted_Part~3.RunUnderscore()" }, (await Method("UsesUnderscore", "Go")).CalledForeignMethods);
         Assert.Contains("Syntax.Tool@Dotted_Part.RunDotted()", (await Method("UsesDotted", "Go")).CalledForeignMethods);
+    }
+
+    /// A file whose own name looks like a numbered one must not end up sharing a name with the numbered one.
+    [Fact]
+    public async Task Given_AFileNamedLikeANumberedTag_When_Extracted_Then_ItsTypeKeepsItsOwnName()
+    {
+        Assert.Equal(new[] { "Syntax.Tool@Dotted_Part~2.RunTilde()" }, (await Method("UsesTilde", "Go")).CalledForeignMethods);
+        Facts facts = await Extracted.Value;
+        Assert.Equal(new[] { "RunTilde" }, facts.Types.Single(t => t.Fqn == "Syntax.Tool@Dotted_Part~2").Methods.Select(m => m.Name));
+        Assert.Equal(new[] { "RunUnderscore" }, facts.Types.Single(t => t.Fqn == "Syntax.Tool@Dotted_Part~3").Methods.Select(m => m.Name));
     }
 
     /// `file class Gen` and `file class Gen<T>` in one file are two types.

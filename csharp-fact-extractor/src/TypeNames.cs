@@ -26,7 +26,8 @@ public static class TypeNames
     /// The file a file-local type is in, without its extension: just the file's name when that is enough,
     /// with as many folders as it takes when its namesakes sit in files of the same name ("A_Helpers", "B_Helpers").
     /// Dots and slashes become "_" so the name still ends at the last dot. Files that read the same after that
-    /// ("Dotted.Part" and "Dotted_Part") are numbered in path order: the second is "Dotted_Part~2".
+    /// ("Dotted.Part" and "Dotted_Part") are numbered in path order: the second is "Dotted_Part~2",
+    /// or the next number no file is already called.
     private static string FileTag(INamedTypeSymbol type)
     {
         static string[] Parts(INamedTypeSymbol t) =>
@@ -42,10 +43,23 @@ public static class TypeNames
             return string.Join("_", file.TakeLast(take)).Replace('.', '_');
         }
 
-        string tag = Tag(own), path = string.Join("/", own);
-        int earlier = all.Select(p => string.Join("/", p)).Distinct()
-            .Count(other => string.CompareOrdinal(other, path) < 0 && Tag(other.Split('/')) == tag);
-        return earlier == 0 ? tag : tag + "~" + (earlier + 1);
+        // In path order: the first file with a tag keeps it; a later one is numbered, skipping every
+        // name that a file's own tag or an earlier number already uses ("Dotted_Part~2.cs" keeps "~2").
+        var paths = all.Select(p => string.Join("/", p)).Distinct().OrderBy(p => p, StringComparer.Ordinal).ToList();
+        var natural = paths.Select(p => Tag(p.Split('/'))).ToHashSet();
+        var given = new Dictionary<string, string>();
+        var used = new HashSet<string>();
+        foreach (string path in paths)
+        {
+            string tag = Tag(path.Split('/')), name = tag;
+            for (int n = 2; !used.Add(name); n++)
+            {
+                name = tag + "~" + n;
+                if (natural.Contains(name)) name = tag;
+            }
+            given[path] = name;
+        }
+        return given[string.Join("/", own)];
     }
 
     /// True when another type with the same name is declared in the same namespace or outer type of the same project.
