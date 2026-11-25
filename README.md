@@ -135,7 +135,7 @@ To read a solution, the extractor asks MSBuild to load its project files.  Loadi
    ```
    Use a RefactorFirst version that includes C# support.  To try it before that version is released, run `mvn install -DskipTests` in this repository first and use the version it prints (for example `0.11.0-SNAPSHOT`).
 
-   In a folder with no `pom.xml` the report is currently written to a folder literally named `${project.basedir}/target/site`.  The last line of the run prints the full path.
+   The report is written to `target/site/refactor-first-report.html` in that folder.  The last line of the run prints the full path.
 
 |Setting|Environment variable|System property|
 |------|------|------|
