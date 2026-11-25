@@ -27,6 +27,18 @@ final class MavenReportOutputDirectory {
     }
 
     /**
+     * The {@code report} goal takes its directory from Maven's report base class. That directory is kept
+     * when Maven resolved it; run without a pom.xml it is not resolved, and the report goes where the
+     * other goals write it.
+     */
+    static String resolveSiteReport(MavenProject project, File reportOutputDirectory) {
+        if (reportOutputDirectory == null || isUnset(reportOutputDirectory.getPath())) {
+            return resolve(project, null);
+        }
+        return reportOutputDirectory.getAbsolutePath();
+    }
+
+    /**
      * Run in a directory with no pom.xml, Maven supplies a stub project whose super-POM defaults are
      * not interpolated, e.g. "${project.basedir}/target/site". Such a value is treated as not set.
      */

@@ -74,6 +74,35 @@ class MavenReportOutputDirectoryTest {
                 MavenReportOutputDirectory.resolve(project, buildDirectory));
     }
 
+    @Test
+    void resolveSiteReport_keepsTheDirectoryMavenResolved() {
+        MavenProject project = projectWithoutPom();
+        File reportDirectory =
+                Path.of("").toAbsolutePath().resolve("target/reports").toFile();
+
+        assertEquals(
+                reportDirectory.getAbsolutePath(),
+                MavenReportOutputDirectory.resolveSiteReport(project, reportDirectory));
+    }
+
+    @Test
+    void resolveSiteReport_ignoresUnresolvedReportDirectoryWhenRunWithoutPom() {
+        MavenProject project = projectWithoutPom();
+
+        assertEquals(
+                Path.of("").toAbsolutePath().resolve("target/site").toString(),
+                MavenReportOutputDirectory.resolveSiteReport(project, new File("${project.basedir}/target/reports")));
+    }
+
+    @Test
+    void resolveSiteReport_fallsBackWhenMavenGivesNoDirectory() {
+        MavenProject project = projectWithoutPom();
+
+        assertEquals(
+                Path.of("").toAbsolutePath().resolve("target/site").toString(),
+                MavenReportOutputDirectory.resolveSiteReport(project, null));
+    }
+
     /** Mirrors the stub project Maven supplies in a directory with no pom.xml: super-POM defaults, not interpolated. */
     private static MavenProject projectWithoutPom() {
         Reporting reporting = new Reporting();

@@ -68,6 +68,15 @@ public class RefactorFirstMavenReport extends AbstractMavenReport {
                 + " have the highest priority values.";
     }
 
+    /**
+     * Maven copies its site resources here and derives the report directory from it. Run in a
+     * directory with no pom.xml the injected default is not resolved, so it is replaced.
+     */
+    @Override
+    protected String getOutputDirectory() {
+        return MavenReportOutputDirectory.resolveSiteReport(project, outputDirectory);
+    }
+
     @Override
     public boolean isExternalReport() {
         return true;
