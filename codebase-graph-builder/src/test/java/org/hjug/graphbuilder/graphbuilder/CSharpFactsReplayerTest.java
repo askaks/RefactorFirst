@@ -142,6 +142,44 @@ class CSharpFactsReplayerTest {
         assertEquals(0, facts.types().size());
     }
 
+    /**
+     * The class name is what the God Class section shows. It has to be the last part of the fqn, the
+     * name every other section shows, or two file-local types with one name become two rows called "Helper".
+     */
+    @Test
+    void givenTypesToldApartOnlyInTheFqn_whenReplayed_thenTheClassNameKeepsWhatTellsThemApart() throws Exception {
+        String json = "{\"schemaVersion\": 1, \"root\": \".\", \"namespaces\": [\"Shop\"], \"types\": ["
+                + type("Shop.Helper@FirstFile", "Shop", "Helper", "FirstFile.cs") + ","
+                + type("Shop.Helper@SecondFile", "Shop", "Helper", "SecondFile.cs") + ","
+                + type("Shop.Order$Line", "Shop", "Line", "Order.cs") + ","
+                + type("Loose", "", "Loose", "Loose.cs") + "]}";
+        Graph<VertexInfo, DefaultWeightedEdge> classGraph =
+                new DefaultDirectedWeightedGraph<>(DefaultWeightedEdge.class);
+        Graph<VertexInfo, DefaultWeightedEdge> packageGraph =
+                new DefaultDirectedWeightedGraph<>(DefaultWeightedEdge.class);
+        GraphMetricsCollector metrics = new GraphMetricsCollector(classGraph, packageGraph);
+
+        CSharpFactsReplayer.replay(
+                CSharpFacts.read(new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8))),
+                new GraphDependencyCollector(classGraph, packageGraph),
+                metrics,
+                new HashMap<>());
+
+        assertEquals(
+                "Helper@FirstFile",
+                metrics.getClassMetrics("Shop.Helper@FirstFile").getClassName());
+        assertEquals(
+                "Helper@SecondFile",
+                metrics.getClassMetrics("Shop.Helper@SecondFile").getClassName());
+        assertEquals("Order$Line", metrics.getClassMetrics("Shop.Order$Line").getClassName());
+        assertEquals("Loose", metrics.getClassMetrics("Loose").getClassName());
+    }
+
+    private static String type(String fqn, String namespace, String name, String sourceFile) {
+        return "{\"fqn\": \"" + fqn + "\", \"namespace\": \"" + namespace + "\", \"name\": \"" + name
+                + "\", \"sourceFile\": \"" + sourceFile + "\", \"loc\": 1}";
+    }
+
     private static double weight(Graph<VertexInfo, DefaultWeightedEdge> graph, String from, String to) {
         VertexInfo source = graph.vertexSet().stream()
                 .filter(v -> v.getName().equals(from))

@@ -25,7 +25,7 @@ final class CSharpFactsReplayer {
             classToSourceFilePathMapping.put(type.fqn(), type.sourceFile());
 
             ClassMetrics classMetrics = metrics.getOrCreateClassMetrics(type.fqn());
-            classMetrics.setClassName(type.name());
+            classMetrics.setClassName(classNameOf(type));
             classMetrics.setPackageName(type.namespace());
             classMetrics.setSourceFilePath(type.sourceFile());
             classMetrics.setLinesOfCode(type.loc());
@@ -67,5 +67,18 @@ final class CSharpFactsReplayer {
                 method.calledForeignMethods().forEach(callee -> metrics.recordIncomingCall(callee, type.fqn(), caller));
             }
         }
+    }
+
+    /**
+     * The fqn without its namespace: the name the report shows. The plain name is not enough, because
+     * the fqn is where two types with one name are told apart ("Helper@FirstFile", "Outer$Inner").
+     */
+    private static String classNameOf(CSharpFacts.TypeFacts type) {
+        String fqn = type.fqn();
+        String namespace = type.namespace();
+        if (namespace != null && !namespace.isEmpty() && fqn.startsWith(namespace + ".")) {
+            return fqn.substring(namespace.length() + 1);
+        }
+        return fqn;
     }
 }

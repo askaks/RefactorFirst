@@ -83,6 +83,25 @@ test('grid color and axis titles match the page repo (U+27F6 suffix)', () => {
     assert.equal(config.options.plugins.legend.position, 'bottom');
 });
 
+test('tooltip says Class for a C# bubble named after its class, File when it still shows the file name', () => {
+    const config = capturedConfig([BUBBLE]);
+    const label = raw => config.options.plugins.tooltip.callbacks.label({raw: {raw}})[0];
+
+    // A C# row is labelled with its class (Clerk lives in Order.cs), so "File:" would be wrong.
+    assert.equal(label({label: 'Clerk', path: 'src/Orders/Order.cs', priority: 1, x: 5, y: 10}), 'Class: Clerk');
+    assert.equal(
+        label({label: 'Helper@FirstFile', path: 'src/FirstFile.cs', priority: 1, x: 5, y: 10}),
+        'Class: Helper@FirstFile'
+    );
+    // A C# row with no class name falls back to the file name, and so to "File:".
+    assert.equal(label({label: 'Order.cs', path: 'src/Orders/Order.cs', priority: 1, x: 5, y: 10}), 'File: Order.cs');
+    // Java and Kotlin rows are unchanged.
+    assert.equal(label({label: 'Order.java', path: 'src/Order.java', priority: 1, x: 5, y: 10}), 'File: Order.java');
+    assert.equal(label({label: 'Order.kt', path: 'src/Order.kt', priority: 1, x: 5, y: 10}), 'File: Order.kt');
+    // No path at all: nothing says it is a class.
+    assert.equal(label({label: 'Order.java', priority: 1, x: 5, y: 10}), 'File: Order.java');
+});
+
 test('tooltip lists File/Priority/Effort Rank/Change Proneness Rank and the click prompt', () => {
     const config = capturedConfig([BUBBLE]);
     const label = config.options.plugins.tooltip.callbacks.label({

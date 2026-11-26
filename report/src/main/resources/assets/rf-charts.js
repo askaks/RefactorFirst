@@ -173,8 +173,12 @@
                         callbacks: {
                             label: context => {
                                 const raw = context.raw.raw;
+                                // A C# bubble is named after its class, not its file
+                                // (one .cs file often holds several classes).
+                                const isClassName = typeof raw.path === 'string' && raw.path.endsWith('.cs')
+                                    && !String(raw.label).endsWith('.cs');
                                 const lines = [
-                                    'File: ' + raw.label,
+                                    (isClassName ? 'Class: ' : 'File: ') + raw.label,
                                     'Priority: ' + raw.priority,
                                     'Effort Rank: ' + raw.x,
                                     'Change Proneness Rank: ' + raw.y
