@@ -136,4 +136,30 @@ class HtmlReportNodeIdTest {
     private static Stream<ClassNodeDTO> flatten(List<PackageNodeDTO> packages) {
         return packages.stream().flatMap(pkg -> Stream.concat(pkg.getClasses().stream(), flatten(pkg.getChildren())));
     }
+
+    /**
+     * C# names carry characters no Java name has: "@" and "~" in a tagged file type, a backtick in a
+     * generic one. Each must still get its own id, made only of characters a DOT id may hold.
+     */
+    @Test
+    void cSharpTaggedAndGenericNamesProduceDistinctAsciiIds() {
+        List<String> names = List.of(
+                "Shop.Helper",
+                "Shop.Helper@FirstFile",
+                "Shop.Helper@SecondFile",
+                "Shop.Helper@Dotted_Part",
+                "Shop.Helper@Dotted_Part~2",
+                "Shop.Helper@Dotted_Part_2",
+                "Shop.Result",
+                "Shop.Result`1",
+                "Shop.Result`1@FirstFile",
+                "Shop.Outer$Helper@FirstFile");
+
+        Set<String> ids = new HashSet<>();
+        for (String name : names) {
+            String id = HtmlReport.renderSafeNodeId(name);
+            assertTrue(id.matches("class_[A-Za-z0-9_]+"), name + " gave " + id);
+            assertTrue(ids.add(id), name + " shares the id " + id);
+        }
+    }
 }

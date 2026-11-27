@@ -175,6 +175,54 @@ class CSharpFactsReplayerTest {
         assertEquals("Loose", metrics.getClassMetrics("Loose").getClassName());
     }
 
+    /**
+     * A tagged file type ("Tool@Dotted_Part~2") and an extension member signed with its receiver ("Twice(Order)")
+     * carry characters no Java name has. A call to either still has to find its method: the caller names it
+     * exactly as the callee's fqn + "." + signature.
+     */
+    @Test
+    void givenATaggedFileTypeAndAnExtensionMember_whenReplayed_thenCallsToThemFindTheirMethods() throws Exception {
+        String json = "{\"schemaVersion\": 1, \"root\": \".\", \"namespaces\": [\"Shop\"], \"types\": ["
+                + "{\"fqn\": \"Shop.Tool@Dotted_Part~2\", \"namespace\": \"Shop\", \"name\": \"Tool\","
+                + " \"sourceFile\": \"Dotted_Part~2.cs\", \"loc\": 1,"
+                + " \"methods\": [{\"name\": \"RunTilde\", \"signature\": \"RunTilde()\"}]},"
+                + "{\"fqn\": \"Shop.Ext\", \"namespace\": \"Shop\", \"name\": \"Ext\","
+                + " \"sourceFile\": \"Ext.cs\", \"loc\": 1,"
+                + " \"methods\": [{\"name\": \"Twice\", \"signature\": \"Twice(Order)\"}]},"
+                + "{\"fqn\": \"Shop.Caller\", \"namespace\": \"Shop\", \"name\": \"Caller\","
+                + " \"sourceFile\": \"Caller.cs\", \"loc\": 1,"
+                + " \"dependencies\": [{\"to\": \"Shop.Tool@Dotted_Part~2\", \"count\": 2},"
+                + " {\"to\": \"Shop.Ext\", \"count\": 1}],"
+                + " \"methods\": [{\"name\": \"Go\", \"signature\": \"Go()\", \"calledForeignMethods\":"
+                + " [\"Shop.Tool@Dotted_Part~2.RunTilde()\", \"Shop.Ext.Twice(Order)\"]}]}]}";
+        Graph<VertexInfo, DefaultWeightedEdge> classGraph =
+                new DefaultDirectedWeightedGraph<>(DefaultWeightedEdge.class);
+        Graph<VertexInfo, DefaultWeightedEdge> packageGraph =
+                new DefaultDirectedWeightedGraph<>(DefaultWeightedEdge.class);
+        GraphMetricsCollector metrics = new GraphMetricsCollector(classGraph, packageGraph);
+        Map<String, String> classToFile = new HashMap<>();
+
+        CSharpFactsReplayer.replay(
+                CSharpFacts.read(new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8))),
+                new GraphDependencyCollector(classGraph, packageGraph),
+                metrics,
+                classToFile);
+        metrics.finalizeMetrics();
+
+        assertEquals(3, classGraph.vertexSet().size());
+        assertEquals(2.0, weight(classGraph, "Shop.Caller", "Shop.Tool@Dotted_Part~2"));
+        assertEquals("Dotted_Part~2.cs", classToFile.get("Shop.Tool@Dotted_Part~2"));
+
+        MethodMetrics runTilde =
+                metrics.getClassMetrics("Shop.Tool@Dotted_Part~2").getMethods().get("RunTilde()");
+        assertEquals(Set.of("Shop.Caller"), runTilde.getChangingClasses());
+        assertEquals(Set.of("Shop.Caller::Go()"), runTilde.getChangingMethods());
+
+        MethodMetrics twice = metrics.getClassMetrics("Shop.Ext").getMethods().get("Twice(Order)");
+        assertEquals(Set.of("Shop.Caller"), twice.getChangingClasses());
+        assertEquals(Set.of("Shop.Caller::Go()"), twice.getChangingMethods());
+    }
+
     private static String type(String fqn, String namespace, String name, String sourceFile) {
         return "{\"fqn\": \"" + fqn + "\", \"namespace\": \"" + namespace + "\", \"name\": \"" + name
                 + "\", \"sourceFile\": \"" + sourceFile + "\", \"loc\": 1}";

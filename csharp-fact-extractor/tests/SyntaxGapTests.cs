@@ -174,4 +174,79 @@ public class SyntaxGapTests
     {
         Assert.Equal(new[] { expected }, (await Method("ExtUser", method)).CalledForeignMethods);
     }
+
+    /// An indexer of a library type is a call, as a library property is. An array element is not: an array has no indexer.
+    [Theory]
+    [InlineData("ListRead", new[] { "System.Collections.Generic.List.get_Item(int)" })]
+    [InlineData("ListWrite", new[] { "System.Collections.Generic.List.set_Item(int,T)" })]
+    [InlineData("TextRead", new[] { "System.String.get_Chars(int)" })]
+    [InlineData("MapRead", new[] { "System.Collections.Generic.Dictionary.get_Item(TKey)" })]
+    [InlineData("MapCreate", new[] { "System.Collections.Generic.Dictionary.set_Item(TKey,TValue)" })]
+    [InlineData("ArrayRead", new string[0])]
+    [InlineData("ArrayWrite", new string[0])]
+    public async Task Given_AnIndexerOfALibraryType_When_ReadOrWritten_Then_ItIsACallAndAnArrayElementIsNot(string method, string[] expected)
+    {
+        Assert.Equal(expected, (await Method("LibraryUser", method)).CalledForeignMethods);
+    }
+
+    /// The file is added to a `file` type's name only to tell it from a namesake. Alone, it keeps its plain name.
+    [Fact]
+    public async Task Given_AFileLocalTypeWithNoNamesake_When_Extracted_Then_ItKeepsItsPlainName()
+    {
+        Assert.Equal("Syntax.Solo", (await TypeNamed("Solo")).Fqn);
+        Assert.Equal(new[] { "Syntax.Solo.Run()" }, (await Method("UsesSolo", "Go")).CalledForeignMethods);
+    }
+
+    /// A public class and a `file` class of one name: the public one keeps its plain name, the `file` one is tagged,
+    /// and inside the `file` class's own file the name means the `file` class.
+    [Fact]
+    public async Task Given_APublicTypeAndAFileLocalTypeWithOneName_When_Extracted_Then_OnlyTheFileLocalOneIsTagged()
+    {
+        Facts facts = await Extracted.Value;
+
+        Assert.Equal(
+            new[] { "Syntax.Mixed", "Syntax.Mixed@MixedFile" },
+            facts.Types.Where(t => t.Name == "Mixed").Select(t => t.Fqn).OrderBy(f => f, StringComparer.Ordinal));
+        Assert.Equal(new[] { "Syntax.Mixed.Open()" }, (await Method("UsesOpenMixed", "Go")).CalledForeignMethods);
+        Assert.Equal(new[] { "Syntax.Mixed@MixedFile.Hidden()" }, (await Method("UsesHiddenMixed", "Go")).CalledForeignMethods);
+    }
+
+    /// More ways to reach an indexer or a property in an assignment: `?[ ]`, a tuple, a longer `?.` chain, `( )++`.
+    [Theory]
+    [InlineData("IndexWriteIfAny", new[] { "Syntax.Grid.set_Item(int,int)" })]
+    [InlineData("IndexInTuple", new[] { "Syntax.Grid.set_Item(int,int)" })]
+    [InlineData("DeepNullConditional", new[] { "Syntax.Line.get_Inner()", "Syntax.Order.set_Total(int)" })]
+    [InlineData("ParenthesizedBump", new[] { "Syntax.Order.get_Total()", "Syntax.Order.set_Total(int)" })]
+    public async Task Given_AnIndexerOrPropertyOfAnotherType_When_AssignedThroughALessCommonForm_Then_TheMatchingAccessorIsCalled(string method, string[] expected)
+    {
+        Assert.Equal(expected, (await Method("FormsUser", method)).CalledForeignMethods.OrderBy(c => c, StringComparer.Ordinal));
+    }
+
+    /// `nameof` is only special when nothing else is called that: a type's own `nameof` method is an ordinary call,
+    /// and what is passed to it is read.
+    [Fact]
+    public async Task Given_ATypeWithItsOwnMethodCalledNameof_When_ItIsCalled_Then_TheArgumentIsRead()
+    {
+        Assert.Equal(new[] { "Syntax.Order.get_Total()" }, (await Method("Shadow", "Go")).CalledForeignMethods);
+    }
+
+    /// Nothing inside `nameof(...)` is a call, but the type named there is still a dependency.
+    [Fact]
+    public async Task Given_ATypeNamedOnlyInsideNameof_When_Extracted_Then_ItIsStillADependency()
+    {
+        Assert.Equal(new[] { "Syntax.Grid" }, (await TypeNamed("NameofOnly")).Dependencies.Select(d => d.To));
+        Assert.Empty((await Method("NameofOnly", "Go")).CalledForeignMethods);
+    }
+
+    /// A record struct is read as a record class is: the members written for it, nothing the compiler adds.
+    [Fact]
+    public async Task Given_ARecordStruct_When_Extracted_Then_OnlyTheMembersItDeclaresAreMethods()
+    {
+        TypeFacts extent = await TypeNamed("Extent");
+
+        Assert.Equal(
+            new[] { "Extent(int,int)", "get_High()", "get_Wide()", "set_High(int)", "set_Wide(int)" },
+            extent.Methods.Select(m => m.Signature).OrderBy(s => s, StringComparer.Ordinal));
+        Assert.Equal(0, extent.ProtectedMembers);
+    }
 }
