@@ -171,7 +171,9 @@ class CSharpFactsReplayerTest {
         assertEquals(
                 "Helper@SecondFile",
                 metrics.getClassMetrics("Shop.Helper@SecondFile").getClassName());
-        assertEquals("Order$Line", metrics.getClassMetrics("Shop.Order$Line").getClassName());
+        // A nested type is written with a dot, as the Java side writes it: a "$" in a class name makes the
+        // change-history lookup look for an outer class's file, and a C# nested God Class would be dropped.
+        assertEquals("Order.Line", metrics.getClassMetrics("Shop.Order$Line").getClassName());
         assertEquals("Loose", metrics.getClassMetrics("Loose").getClassName());
     }
 
