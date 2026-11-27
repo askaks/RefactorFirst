@@ -7,6 +7,8 @@ public static class Ext
         public int Twice() { return order.Total * 2; }
 
         public int Doubled { get { return order.Total * 2; } }
+
+        public static int Zero() { return 0; }
     }
 
     extension(Grid grid)
@@ -31,4 +33,6 @@ public class ExtUser
     public int GoProperty(Order order) { return order.Doubled; }
 
     public int GoGeneric(List<int> items) { return items.Size(); }
+
+    public int GoStaticMember() { return Order.Zero(); }
 }

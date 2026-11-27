@@ -157,10 +157,12 @@ public class SyntaxGapTests
         Assert.DoesNotContain(facts.Types, t => t.Name.Length == 0 || t.Fqn.EndsWith('$'));
         TypeFacts ext = await TypeNamed("Ext");
         Assert.Equal(
-            new[] { "Size<T>(List<T>)", "Twice(Grid)", "Twice(Order)", "get_Doubled(Order)" },
+            new[] { "Size<T>(List<T>)", "Twice(Grid)", "Twice(Order)", "Zero()", "get_Doubled(Order)" },
             ext.Methods.Select(m => m.Signature).OrderBy(s => s, StringComparer.Ordinal));
         Assert.Equal(new[] { "Syntax.Grid", "Syntax.Order" }, ext.Dependencies.Select(d => d.To));
         Assert.Equal(1, ext.Methods.Single(m => m.Signature == "Twice(Order)").Parameters);
+        // A static member of the block has no receiver: it compiles to a static method without one.
+        Assert.Equal(0, ext.Methods.Single(m => m.Signature == "Zero()").Parameters);
     }
 
     /// However an extension member is called, the call names it the way it names itself.
@@ -170,6 +172,7 @@ public class SyntaxGapTests
     [InlineData("GoGrid", "Syntax.Ext.Twice(Grid)")]
     [InlineData("GoProperty", "Syntax.Ext.get_Doubled(Order)")]
     [InlineData("GoGeneric", "Syntax.Ext.Size<T>(List<T>)")]
+    [InlineData("GoStaticMember", "Syntax.Ext.Zero()")]
     public async Task Given_AnExtensionBlockMember_When_Called_Then_TheCallUsesTheSameSignature(string method, string expected)
     {
         Assert.Equal(new[] { expected }, (await Method("ExtUser", method)).CalledForeignMethods);
