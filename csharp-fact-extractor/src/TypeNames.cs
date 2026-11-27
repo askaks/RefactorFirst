@@ -14,7 +14,8 @@ public static class TypeNames
         {
             // An `extension(...) { }` block is not a type of its own: what is in it belongs to the class around it.
             if (t.IsExtension) continue;
-            bool hasNamesake = HasNamesake(t);
+            // Only a generic or a file-local type is named differently for having a namesake, so only those are looked up.
+            bool hasNamesake = (t.Arity > 0 || t.IsFileLocal) && HasNamesake(t);
             string name = t.Arity > 0 && hasNamesake ? t.Name + "`" + t.Arity : t.Name;
             // Two `file class Helper` in two files are two types, told apart by the file: "Helper@FirstFile".
             names.Push(t.IsFileLocal && hasNamesake ? name + "@" + FileTag(t) : name);
@@ -25,7 +26,8 @@ public static class TypeNames
 
     /// The file a file-local type is in, without its extension: just the file's name when that is enough,
     /// with as many folders as it takes when its namesakes sit in files of the same name ("A_Helpers", "B_Helpers").
-    /// Dots and slashes become "_" so the name still ends at the last dot. Files that read the same after that
+    /// Anything but a letter, a digit, "_" or "~" becomes "_", so the name still ends at its last dot and a "$"
+    /// in a file name is not read as a nested type. Files that read the same after that
     /// ("Dotted.Part" and "Dotted_Part") are numbered in path order: the second is "Dotted_Part~2",
     /// or the next number no file is already called.
     private static string FileTag(INamedTypeSymbol type)
@@ -40,7 +42,7 @@ public static class TypeNames
         {
             int take = 1;
             while (take < file.Length && all.Any(p => !p.SequenceEqual(file) && p.TakeLast(take).SequenceEqual(file.TakeLast(take)))) take++;
-            return string.Join("_", file.TakeLast(take)).Replace('.', '_');
+            return string.Concat(string.Join("_", file.TakeLast(take)).Select(c => char.IsLetterOrDigit(c) || c is '_' or '~' ? c : '_'));
         }
 
         // In path order: the first file with a tag keeps it; a later one is numbered, skipping every

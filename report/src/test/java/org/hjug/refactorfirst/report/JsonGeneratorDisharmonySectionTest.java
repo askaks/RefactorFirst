@@ -114,4 +114,17 @@ class JsonGeneratorDisharmonySectionTest {
                 section.getTable().getRows().get(0).getCells().get(0).getContent());
         assertEquals("Order.cs", section.getChart().getBubbles().get(0).getLabel());
     }
+
+    @DisplayName("a C# row with an empty class name falls back to its file name, not to a blank cell")
+    @Test
+    void buildDisharmonySection_cSharpRowWithAnEmptyClassNameShowsTheFileName() {
+        RankedDisharmony rd = mockRankedDisharmony("Order.cs", "src/Orders/Order.cs", "");
+
+        DisharmonySectionDTO section = sectionFor(rd);
+
+        assertEquals(
+                "Order.cs",
+                section.getTable().getRows().get(0).getCells().get(0).getContent());
+        assertEquals("Order.cs", section.getChart().getBubbles().get(0).getLabel());
+    }
 }

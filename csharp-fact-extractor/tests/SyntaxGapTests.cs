@@ -98,6 +98,22 @@ public class SyntaxGapTests
         Assert.Equal(new[] { "Syntax.Tool@B_Helpers.RunB()" }, (await Method("UsesB", "Go")).CalledForeignMethods);
     }
 
+    /// A file name can hold characters that mean something in a type's name: `$` joins nested types, and a space or
+    /// a bracket has no place in one. Each becomes `_`, and two files that then read the same are numbered as usual.
+    [Fact]
+    public async Task Given_FileLocalTypesInFilesWithOddCharacters_When_Extracted_Then_TheTagHoldsOnlyLettersDigitsAndUnderscores()
+    {
+        Facts facts = await Extracted.Value;
+
+        Assert.Equal(
+            new[] { "Syntax.Gadget@Odd_Name", "Syntax.Gadget@Odd_Name~2", "Syntax.Gadget@Odd__copy_" },
+            facts.Types.Where(t => t.Name == "Gadget").Select(t => t.Fqn).OrderBy(f => f, StringComparer.Ordinal));
+        // `Odd$Name.cs` comes first in path order, so it keeps the plain tag and `Odd_Name.cs` is numbered.
+        Assert.Equal(new[] { "Syntax.Gadget@Odd_Name.RunDollar()" }, (await Method("UsesDollar", "Go")).CalledForeignMethods);
+        Assert.Equal(new[] { "Syntax.Gadget@Odd_Name~2.RunPlain()" }, (await Method("UsesOddPlain", "Go")).CalledForeignMethods);
+        Assert.Equal(new[] { "Syntax.Gadget@Odd__copy_.RunCopy()" }, (await Method("UsesCopy", "Go")).CalledForeignMethods);
+    }
+
     /// `Dotted.Part.cs` and `Dotted_Part.cs` read the same once the dot is replaced; the second one in path order is numbered.
     /// The number skips any name a real file already has: `Dotted_Part~2.cs` keeps "Dotted_Part~2", so the numbered one is "~3".
     [Fact]

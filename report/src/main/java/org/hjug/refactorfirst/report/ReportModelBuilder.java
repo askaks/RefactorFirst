@@ -991,7 +991,10 @@ public class ReportModelBuilder {
      */
     static String displayName(RankedDisharmony rd) {
         String path = rd.getPath();
-        if (path != null && path.endsWith(".cs") && rd.getClassName() != null) {
+        if (path != null
+                && path.endsWith(".cs")
+                && rd.getClassName() != null
+                && !rd.getClassName().isEmpty()) {
             return getClassName(rd.getClassName());
         }
         return rd.getFileName();
