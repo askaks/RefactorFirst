@@ -219,6 +219,28 @@ class HierarchyBuilderTest {
         assertEquals("src/main/kotlin/org/pkg/Widget.kt", anon.getPath());
     }
 
+    @DisplayName("a nested C# class is labelled Outer.Inner, the name the findings tables show")
+    @Test
+    void buildClassHierarchy_labelsANestedCSharpClassWithADot() {
+        // Given: a C# class nested in Order (declared in a .cs file), and a Java nested class beside it
+        Graph<VertexInfo, DefaultWeightedEdge> classGraph = newGraph();
+        addEdge(classGraph, "Shop.Order$Line", "Shop.Clerk", 1);
+        addEdge(classGraph, "Shop.Outer$Inner", "Shop.Clerk", 1);
+        Map<String, String> sourcePaths = new HashMap<>();
+        sourcePaths.put("Shop.Order$Line", "src/Shop/Order.cs");
+        sourcePaths.put("Shop.Outer$Inner", "src/main/java/Shop/Outer.java");
+
+        HierarchyDTO hierarchy =
+                HierarchyBuilder.buildClassHierarchy(classGraph, dto(sourcePaths), Set.of(), Set.of(), Set.of());
+
+        // Then: the C# label has a dot; its fqn and id are untouched; the Java label keeps its "$"
+        PackageNodeDTO shop = hierarchy.getPackages().get(0);
+        ClassNodeDTO line = classByFqn(shop, "Shop.Order$Line");
+        assertEquals("Order.Line", line.getLabel());
+        assertEquals("class_Shop_002eOrder_0024Line", line.getId());
+        assertEquals("Outer$Inner", classByFqn(shop, "Shop.Outer$Inner").getLabel());
+    }
+
     @DisplayName("sink-only anonymous classes are suppressed but their neighbours still render")
     @Test
     void buildClassHierarchy_suppressesSinkOnlyAnonymousClasses() {

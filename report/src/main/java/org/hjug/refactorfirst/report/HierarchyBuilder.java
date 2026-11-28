@@ -215,7 +215,7 @@ public final class HierarchyBuilder {
                             .label(
                                     HtmlReport.isAnonymousFqn(vertex)
                                             ? HtmlReport.anonymousOwnerLabel(vertex, codebaseGraphDTO)
-                                            : SimpleHtmlReport.getClassName(vertex))
+                                            : classLabel(vertex, codebaseGraphDTO))
                             .path(classSourcePath(vertex, codebaseGraphDTO))
                             .markedForRemoval(classesToRemove.contains(VertexInfo.forName(vertex)))
                             .build());
@@ -272,6 +272,15 @@ public final class HierarchyBuilder {
             return enclosingDot > 0 ? enclosing.substring(0, enclosingDot) : null;
         }
         return lastDot > 0 ? fqn.substring(0, lastDot) : null;
+    }
+
+    /**
+     * The simple class name, for every place the report names a class of the graph. A nested C# class
+     * (one declared in a .cs file) is written with a dot, "Order.Line"; Java and Kotlin keep "Outer$Inner".
+     */
+    static String classLabel(String vertex, CodebaseGraphDTO codebaseGraphDTO) {
+        String label = SimpleHtmlReport.getClassName(vertex);
+        return classSourcePath(vertex, codebaseGraphDTO).endsWith(".cs") ? label.replace('$', '.') : label;
     }
 
     /** Returns the source file path relative to the project root, or an empty string. */

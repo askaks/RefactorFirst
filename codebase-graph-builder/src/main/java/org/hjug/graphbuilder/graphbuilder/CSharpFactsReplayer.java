@@ -25,7 +25,10 @@ final class CSharpFactsReplayer {
             classToSourceFilePathMapping.put(type.fqn(), type.sourceFile());
 
             ClassMetrics classMetrics = metrics.getOrCreateClassMetrics(type.fqn());
-            classMetrics.setClassName(classNameOf(type));
+            // The whole fqn, the name every other section's row carries, so the report shortens one form
+            // and shows one name. It is also a key of the source-file map: the change-history lookup then
+            // does not take the "$" of a nested type for a lambda, look up the outer class and drop the row.
+            classMetrics.setClassName(type.fqn());
             classMetrics.setPackageName(type.namespace());
             classMetrics.setSourceFilePath(type.sourceFile());
             classMetrics.setLinesOfCode(type.loc());
@@ -67,20 +70,5 @@ final class CSharpFactsReplayer {
                 method.calledForeignMethods().forEach(callee -> metrics.recordIncomingCall(callee, type.fqn(), caller));
             }
         }
-    }
-
-    /**
-     * The fqn without its namespace: the name the report shows. The plain name is not enough, because
-     * the fqn is where two types with one name are told apart ("Helper@FirstFile"). A nested type is
-     * written with a dot ("Outer.Inner"), as the Java side writes it: for a "$" in a class name, the
-     * change-history lookup looks up "Outer" alone, finds no file, and the God Class row is dropped.
-     */
-    private static String classNameOf(CSharpFacts.TypeFacts type) {
-        String fqn = type.fqn();
-        String namespace = type.namespace();
-        if (namespace != null && !namespace.isEmpty() && fqn.startsWith(namespace + ".")) {
-            return fqn.substring(namespace.length() + 1).replace('$', '.');
-        }
-        return fqn.replace('$', '.');
     }
 }

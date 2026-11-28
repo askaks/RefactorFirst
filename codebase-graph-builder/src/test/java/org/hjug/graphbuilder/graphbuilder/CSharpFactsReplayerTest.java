@@ -143,8 +143,9 @@ class CSharpFactsReplayerTest {
     }
 
     /**
-     * The class name is what the God Class section shows. It has to be the last part of the fqn, the
-     * name every other section shows, or two file-local types with one name become two rows called "Helper".
+     * The class name is what the God Class section is given. It has to be the fqn, the name every other
+     * section is given, or the report shows one class under two names; the plain name would also make
+     * two file-local types with one name two rows called "Helper".
      */
     @Test
     void givenTypesToldApartOnlyInTheFqn_whenReplayed_thenTheClassNameKeepsWhatTellsThemApart() throws Exception {
@@ -166,14 +167,15 @@ class CSharpFactsReplayerTest {
                 new HashMap<>());
 
         assertEquals(
-                "Helper@FirstFile",
+                "Shop.Helper@FirstFile",
                 metrics.getClassMetrics("Shop.Helper@FirstFile").getClassName());
         assertEquals(
-                "Helper@SecondFile",
+                "Shop.Helper@SecondFile",
                 metrics.getClassMetrics("Shop.Helper@SecondFile").getClassName());
-        // A nested type is written with a dot, as the Java side writes it: a "$" in a class name makes the
-        // change-history lookup look for an outer class's file, and a C# nested God Class would be dropped.
-        assertEquals("Order.Line", metrics.getClassMetrics("Shop.Order$Line").getClassName());
+        // A nested type keeps its whole fqn too: that is a key of the source-file map, so the
+        // change-history lookup does not take the "$" for a lambda and drop the God Class row.
+        assertEquals(
+                "Shop.Order$Line", metrics.getClassMetrics("Shop.Order$Line").getClassName());
         assertEquals("Loose", metrics.getClassMetrics("Loose").getClassName());
     }
 

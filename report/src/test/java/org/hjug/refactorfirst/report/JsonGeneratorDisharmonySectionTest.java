@@ -87,6 +87,33 @@ class JsonGeneratorDisharmonySectionTest {
                 "src/Orders/Order.cs", section.getChart().getBubbles().get(0).getPath());
     }
 
+    @DisplayName("a nested C# class is named with its outer class, written with a dot")
+    @Test
+    void buildDisharmonySection_nestedCSharpRowShowsOuterDotInner() {
+        // Given: a finding in class Line, which is nested in class Order
+        RankedDisharmony rd = mockRankedDisharmony("Order.cs", "src/Orders/Order.cs", "Shop.Orders.Order$Line");
+
+        DisharmonySectionDTO section = sectionFor(rd);
+
+        assertEquals(
+                "Order.Line",
+                section.getTable().getRows().get(0).getCells().get(0).getContent());
+        assertEquals("Order.Line", section.getChart().getBubbles().get(0).getLabel());
+        assertEquals("Order.Line", section.getChart().getBubbles().get(0).getId());
+    }
+
+    @DisplayName("a class nested twice, inside a tagged file type and with no namespace, keeps every part")
+    @Test
+    void buildDisharmonySection_deeplyNestedCSharpRowKeepsEveryPart() {
+        RankedDisharmony rd = mockRankedDisharmony("FirstFile.cs", "src/FirstFile.cs", "Helper@FirstFile$Inner$Deep");
+
+        DisharmonySectionDTO section = sectionFor(rd);
+
+        assertEquals(
+                "Helper@FirstFile.Inner.Deep",
+                section.getTable().getRows().get(0).getCells().get(0).getContent());
+    }
+
     @DisplayName("a Java row keeps its file name even when the class name is known")
     @Test
     void buildDisharmonySection_javaRowStillShowsTheFileName() {

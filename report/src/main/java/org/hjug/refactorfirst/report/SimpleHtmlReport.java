@@ -15,6 +15,7 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.hjug.cbc.RankedCycle;
 import org.hjug.git.GitLogReader;
+import org.hjug.graphbuilder.CodebaseGraphDTO;
 import org.hjug.graphbuilder.VertexInfo;
 import org.hjug.graphbuilder.metrics.DisharmonyTypes;
 import org.hjug.refactorfirst.report.model.RefactorFirstReportDTO;
@@ -298,10 +299,10 @@ public class SimpleHtmlReport {
     }
 
     /** Builds the summary-table cells for a ranked class cycle. */
-    static String[] getRankedCycleSummaryData(RankedCycle rankedCycle) {
+    static String[] getRankedCycleSummaryData(RankedCycle rankedCycle, CodebaseGraphDTO codebaseGraphDTO) {
         return new String[] {
             // "Cycle Name", "Priority", "Class Count", "Relationship Count"
-            getClassName(rankedCycle.getCycleName()),
+            HierarchyBuilder.classLabel(rankedCycle.getCycleName(), codebaseGraphDTO),
             rankedCycle.getPriority().toString(),
             String.valueOf(rankedCycle.getCycleNodes().size()),
             String.valueOf(rankedCycle.getEdgeSet().size())

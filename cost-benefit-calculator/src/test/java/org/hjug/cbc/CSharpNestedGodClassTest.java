@@ -13,6 +13,7 @@ import java.util.stream.IntStream;
 import org.eclipse.jgit.api.Git;
 import org.hjug.graphbuilder.CodebaseGraphDTO;
 import org.hjug.graphbuilder.graphbuilder.CSharpSourceFileGraphBuilder;
+import org.hjug.graphbuilder.metrics.DisharmonyTypes;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -82,6 +83,17 @@ class CSharpNestedGodClassTest {
             assertEquals(1, ranked.size());
             assertEquals("Order.cs", ranked.get(0).getPath());
             assertEquals(1, ranked.get(0).getCommitCount());
+            // The same name every other section's row carries, so the report shows one name for the class.
+            assertEquals("Shop.Order$Line", ranked.get(0).getClassName());
+
+            // The path the report takes for its God Class section: the row is there, with the same name.
+            List<RankedDisharmony> reported = calculator.calculateDisharmonyCostBenefitValues(
+                    calculator.getClassDisharmonies(graph, DisharmonyTypes.GOD_CLASS));
+
+            assertEquals(1, reported.size());
+            assertEquals("Order.cs", reported.get(0).getPath());
+            assertEquals(1, reported.get(0).getCommitCount());
+            assertEquals("Shop.Order$Line", reported.get(0).getClassName());
         }
     }
 }

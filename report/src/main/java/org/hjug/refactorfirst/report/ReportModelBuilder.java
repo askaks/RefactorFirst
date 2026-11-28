@@ -384,8 +384,8 @@ public class ReportModelBuilder {
                         .targetClass(endVertex)
                         .sourceClassPath(classSourcePath(startVertex, codebaseGraphDTO))
                         .targetClassPath(classSourcePath(endVertex, codebaseGraphDTO))
-                        .simpleSourceClassName(getClassName(startVertex))
-                        .simpleTargetClassName(getClassName(endVertex))
+                        .simpleSourceClassName(HierarchyBuilder.classLabel(startVertex, codebaseGraphDTO))
+                        .simpleTargetClassName(HierarchyBuilder.classLabel(endVertex, codebaseGraphDTO))
                         .sourceMarked(classesToRemove.contains(VertexInfo.forName(startVertex)))
                         .targetMarked(classesToRemove.contains(VertexInfo.forName(endVertex)))
                         .weight((int) classGraph.getEdgeWeight(edgeInfo.getEdge()))
@@ -525,7 +525,7 @@ public class ReportModelBuilder {
             // 6. Cycles
             List<CycleSummaryDTO> cycleSummaries = new ArrayList<>();
             for (RankedCycle cycle : rankedClassCycles) {
-                String[] summaryData = SimpleHtmlReport.getRankedCycleSummaryData(cycle);
+                String[] summaryData = SimpleHtmlReport.getRankedCycleSummaryData(cycle, codebaseGraphDTO);
                 cycleSummaries.add(CycleSummaryDTO.builder()
                         .cycleName(summaryData[0])
                         .priority(Integer.parseInt(summaryData[1]))
@@ -537,8 +537,9 @@ public class ReportModelBuilder {
             LargestCycleDTO largestCycleDTO = null;
             if (!rankedClassCycles.isEmpty()) {
                 RankedCycle largestCycle = rankedClassCycles.get(0);
-                String cycleName = getClassName(largestCycle.getCycleName());
-                String cycleIdentifier = graphIdentifier(cycleName);
+                String cycleName = HierarchyBuilder.classLabel(largestCycle.getCycleName(), codebaseGraphDTO);
+                // the identifier keeps the name as the graph has it, so it is the same for every language
+                String cycleIdentifier = graphIdentifier(getClassName(largestCycle.getCycleName()));
                 int cCount = largestCycle.getCycleNodes().size();
                 int rCount = largestCycle.getEdgeSet().size();
                 HierarchyDTO cycleHierarchy = HierarchyBuilder.buildCycleHierarchy(
@@ -570,7 +571,7 @@ public class ReportModelBuilder {
                     // project root and the removal marker; viewers build the URL from
                     // project.repoUrl
                     breakdown.add(CycleBreakdownRowDTO.builder()
-                            .className(getClassName(vertex))
+                            .className(HierarchyBuilder.classLabel(vertex, codebaseGraphDTO))
                             .classPath(classSourcePath(vertex, codebaseGraphDTO))
                             .marked(marked)
                             .edgesHtml(edges.toString())
@@ -897,8 +898,8 @@ public class ReportModelBuilder {
                     .targetClass(endVertex)
                     .sourceClassPath(classSourcePath(startVertex, codebaseGraphDTO))
                     .targetClassPath(classSourcePath(endVertex, codebaseGraphDTO))
-                    .simpleSourceClassName(getClassName(startVertex))
-                    .simpleTargetClassName(getClassName(endVertex))
+                    .simpleSourceClassName(HierarchyBuilder.classLabel(startVertex, codebaseGraphDTO))
+                    .simpleTargetClassName(HierarchyBuilder.classLabel(endVertex, codebaseGraphDTO))
                     .sourceMarked(classesToRemove.contains(VertexInfo.forName(startVertex)))
                     .targetMarked(classesToRemove.contains(VertexInfo.forName(endVertex)))
                     .weight(weight)
@@ -979,15 +980,18 @@ public class ReportModelBuilder {
 
         // &#8594; is HTML "Right Arrow" code
         return edgesToCut
-                .append(SimpleHtmlReport.escapeHtmlLabel(getClassName(startVertex)) + " &#8594; "
-                        + SimpleHtmlReport.escapeHtmlLabel(getClassName(endVertex)) + " : "
+                .append(SimpleHtmlReport.escapeHtmlLabel(HierarchyBuilder.classLabel(startVertex, codebaseGraphDTO))
+                        + " &#8594; "
+                        + SimpleHtmlReport.escapeHtmlLabel(HierarchyBuilder.classLabel(endVertex, codebaseGraphDTO))
+                        + " : "
                         + (int) classGraph.getEdgeWeight(edge))
                 .toString();
     }
 
     /**
      * The name a finding is shown under: its file name, except for C#, where one file often
-     * holds several classes and the class name is what tells the rows apart.
+     * holds several classes and the class name is what tells the rows apart. A nested C# class is
+     * shown with its outer class, "Order.Line" for the fqn "Shop.Order$Line".
      */
     static String displayName(RankedDisharmony rd) {
         String path = rd.getPath();
@@ -995,7 +999,7 @@ public class ReportModelBuilder {
                 && path.endsWith(".cs")
                 && rd.getClassName() != null
                 && !rd.getClassName().isEmpty()) {
-            return getClassName(rd.getClassName());
+            return getClassName(rd.getClassName()).replace('$', '.');
         }
         return rd.getFileName();
     }
